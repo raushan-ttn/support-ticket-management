@@ -1,0 +1,1 @@
+cd backend-node && npx lint-staged
