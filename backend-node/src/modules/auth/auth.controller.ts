@@ -13,7 +13,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const data = await authService.login(req.body);
+    const data = await authService.signToken(req.user as Express.User);
     success(res, data);
   } catch (err) {
     next(err);

@@ -4,6 +4,13 @@ dotenv.config();
 interface Config {
   env: string;
   port: number;
+  cors: {
+    origin: string;
+  };
+  rateLimit: {
+    windowMs: number;
+    max: number;
+  };
   postgres: {
     host: string;
     port: number;
@@ -33,6 +40,15 @@ interface Config {
 const config: Config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
+
+  cors: {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  },
+
+  rateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 min
+    max: parseInt(process.env.RATE_LIMIT_MAX || '20', 10),
+  },
 
   postgres: {
     host: process.env.PG_HOST || 'localhost',
