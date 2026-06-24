@@ -1,0 +1,6 @@
+{
+  "watch": ["src", "bin"],
+  "ext": "ts",
+  "ignore": ["dist/**"],
+  "exec": "ts-node --project tsconfig.json bin/www.ts"
+}
