@@ -42,12 +42,9 @@ src/
 ## Rules Reference
 | Topic | File |
 |-------|------|
-| TypeScript | `.claude/rules/typescript.md` |
-| Coding Standards | `.claude/rules/coding-standards.md` |
-| Database (pg + Redis) | `.claude/rules/database.md` |
-| API Design | `.claude/rules/api.md` |
-| Testing | `.claude/rules/testing.md` |
-| Security | `.claude/rules/security.md` |
+| Security, Auth, RBAC, File Uploads | `.claude/rules/security.md` |
+| API Design, TypeScript, Code Structure, Testing | `.claude/rules/api-conventions.md` |
+| PostgreSQL, Redis, BullMQ | `.claude/rules/db-conventions.md` |
 
 ## Environment Variables
 | Variable | Default | Notes |
@@ -83,3 +80,4 @@ src/
 
 ## Plans
 `.claude/plans/backend-tooling.md` · `.claude/plans/backend-database.md` · `.claude/plans/backend-schema.md`
+`.claude/plans/schema-alignment.md` · `.claude/plans/tickets-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md`
