@@ -1,13 +1,8 @@
-export {};
+import { AuthUser } from '../modules/auth/auth.schemas';
 
 declare global {
   namespace Express {
-    interface User {
-      id: string;
-      name: string;
-      email: string;
-      role: 'admin' | 'agent' | 'user';
-      status: 'active' | 'blocked';
-    }
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    interface User extends AuthUser {}
   }
 }

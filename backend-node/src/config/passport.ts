@@ -10,7 +10,7 @@ interface LocalUserRow {
   name: string;
   email: string;
   password_hash: string;
-  role: 'admin' | 'agent' | 'user';
+  role: 'admin' | 'agent';
   status: 'active' | 'blocked';
 }
 
@@ -18,13 +18,13 @@ interface SafeUserRow {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'agent' | 'user';
+  role: 'admin' | 'agent';
   status: 'active' | 'blocked';
 }
 
 interface JwtPayload {
   sub: string;
-  role: 'admin' | 'agent' | 'user';
+  role: 'admin' | 'agent';
 }
 
 passport.use(
