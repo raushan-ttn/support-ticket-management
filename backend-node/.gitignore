@@ -65,3 +65,6 @@ dist/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+.mcp.json
+.env.mcp
