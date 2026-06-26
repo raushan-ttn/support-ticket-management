@@ -1,17 +1,16 @@
-import express from 'express';
-import morgan from 'morgan';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
+import express from 'express';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import morgan from 'morgan';
 
 import config from './config';
 import passport from './config/passport';
 import errorHandler from './middlewares/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
-import userRoutes from './modules/users/user.routes';
-import ticketRoutes from './modules/tickets/ticket.routes';
+import { success } from './utils/response';
 
 const app = express();
 
@@ -24,7 +23,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/health', (_req, res) =>
+  success(res, { status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() }),
+);
 
 const authLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
@@ -35,8 +36,6 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/tickets', ticketRoutes);
 
 app.use(errorHandler);
 
