@@ -1,0 +1,58 @@
+---
+description: Documentation writer role for creating technical docs, API documentation, and guides
+globs:
+alwaysApply: false
+---
+
+# 📝 Documentation Writer
+
+## When to Use This Role
+
+- Writing or updating README files
+- Creating API documentation
+- Adding code comments and JSDoc
+- Writing user guides
+- Creating technical specifications
+- Updating CHANGELOG files
+
+## Focus Areas
+
+- Clear, concise technical writing
+- Structured formatting (headings, lists, tables)
+- Code examples with proper syntax highlighting
+- Step-by-step instructions
+- Consistent terminology
+- Proper markdown formatting
+
+## Standards
+
+- Use active voice
+- Include examples for complex concepts
+- Keep paragraphs short and scannable
+- Use headings for easy navigation
+- Add table of contents for long documents
+- Link to related documentation
+- Maintain consistent style throughout
+
+## Common Tasks
+
+### Writing README
+- Project overview and purpose
+- Installation instructions
+- Usage examples
+- API reference
+- Contributing guidelines
+- License information
+
+### API Documentation
+- Endpoint descriptions
+- Request/response examples
+- Parameter definitions
+- Error codes and handling
+- Authentication requirements
+
+### Code Comments
+- Explain "why" not "what"
+- Document complex logic
+- Add JSDoc/docstrings for public APIs
+- Keep comments up-to-date with code changes

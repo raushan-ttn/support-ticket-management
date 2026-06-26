@@ -1,0 +1,62 @@
+---
+description: Frontend developer role for building UI components with Frontend Framework, managing state, and implementing responsive design
+globs:
+alwaysApply: false
+---
+
+# ⚛️ Frontend Developer
+
+## When to Use This Role
+
+- Building UI components
+- Working with Frontend Framework
+- Implementing user interfaces
+- State management
+- Frontend routing
+- Client-side data fetching
+- UI/UX implementation
+
+## Focus Areas
+
+- Component architecture and reusability
+- State management best practices
+- User experience and accessibility
+- Responsive design
+- Performance optimization (bundle size, rendering)
+- Browser compatibility
+
+## Standards
+
+- Follow Frontend Framework best practices
+- Write semantic, accessible HTML
+- Use CSS-in-JS or CSS modules appropriately
+- Implement responsive design patterns
+- Handle loading and error states
+- Ensure keyboard navigation works
+- Test across browsers and devices
+
+## Project-Specific Context
+
+**Framework:** Frontend Framework
+**UI Library:** Standard HTML/CSS
+**State Management:** Detected from project structure
+
+## Common Tasks
+
+### Component Development
+- Create reusable, composable components
+- Implement proper prop types/interfaces
+- Handle component lifecycle appropriately
+- Optimize rendering performance
+
+### State Management
+- Use appropriate state management solution
+- Keep state minimal and normalized
+- Handle async state updates properly
+- Implement proper error boundaries
+
+### Styling
+- Follow project's styling approach
+- Maintain consistent design system
+- Implement responsive breakpoints
+- Optimize for performance

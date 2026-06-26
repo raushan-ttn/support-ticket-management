@@ -1,0 +1,111 @@
+---
+description: Code style, TypeScript conventions, naming rules, Zod validation patterns, and error handling
+globs:
+alwaysApply: false
+---
+
+# Code Style & TypeScript
+
+## TypeScript
+
+- `strict: true` — never disable; `target: ES2020`, `module: commonjs`, output to `dist/`
+- Controllers always return `Promise<void>`
+- Use `interface` for object shapes, `type` for unions only
+- No `any` — use `unknown` + type guards; no `!` without proof — prefer `?.`
+- Guard pg `rowCount`: `if (result.rowCount && result.rowCount > 0)`
+- All I/O: `async/await` — no callbacks or `.then()`
+- Exception: BullMQ `.add()` is fire-and-forget
+
+## Naming Conventions
+
+| Token | Convention | Example |
+|---|---|---|
+| TS files | dot-separated kebab | `ticket.service.ts` |
+| SQL files | kebab-case | `schema.sql` |
+| Variables / Functions | camelCase | `getUserById` |
+| Interfaces | PascalCase — no `I`-prefix | `TicketRow` |
+| Constants | SCREAMING_SNAKE | `SALT_ROUNDS` |
+| Env variables | SCREAMING_SNAKE | `PG_DATABASE` |
+| PG columns/tables/ENUMs | snake_case | `created_at`, `ticket_status` |
+| Redis keys | `{resource}:{id}` | `ticket:uuid-123` |
+
+## Exports
+
+| Layer | Style |
+|---|---|
+| Router, App, Middleware, Config | `export default` |
+| Controllers, Services, Utils, DB helpers | Named exports |
+
+Never mix both styles in one file.
+
+## Imports
+
+Group in this order: built-ins → third-party → internal.
+Use `* as` for services; destructure for types.
+
+## Zod Validation
+
+All schemas in `src/modules/{module}/{module}.schemas.ts`.
+
+```ts
+import { z } from 'zod';
+
+export const createTicketSchema = z.object({
+  title:       z.string().trim().min(1).max(500),
+  description: z.string().trim().min(1),
+  priority:    z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+});
+
+export const listTicketsQuerySchema = z.object({
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED']).optional(),
+  page:   z.coerce.number().int().min(1).default(1),   // coerce required for query strings
+  limit:  z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export type CreateTicketPayload = z.infer<typeof createTicketSchema>;
+```
+
+### Rules
+
+- `z.coerce.number()` for all numeric query params — never `parseInt`
+- `.trim().min(1)` on all string inputs — rejects whitespace-only
+- `.default()` on optional fields — services never receive `undefined`
+- `z.infer<typeof schema>` for types — never define separately from schemas
+- `safeParse` in middleware; `.parse()` for path params only (throws ZodError → errorHandler → 400)
+
+### Path Parameters
+
+```ts
+export const uuidParam = z.string().uuid({ message: 'Invalid UUID' });
+// In controller: const id = uuidParam.parse(req.params.id);
+```
+
+## Error Handling
+
+- Controllers: `try/catch` → `next(err)` in catch — never `res.status(5xx).json()`
+- Services: throw with `statusCode` for domain errors (`400`, `403`, `404`, `409`)
+- Always `return` after `error(res, ...)` to prevent double-send
+
+```ts
+// Controller pattern
+export const getTicket = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const id = uuidParam.parse(req.params.id);
+    const ticket = await ticketService.getById(id);
+    success(res, ticket);
+  } catch (err) {
+    next(err);
+  }
+};
+```
+
+## Comments
+
+Only when the **why** is non-obvious. Never describe what the code does — no narration comments.
+
+## Formatting & Linting
+
+- **Prettier:** `singleQuote: true`, `semi: true`, `trailingComma: all`, `printWidth: 100`, `tabWidth: 2`
+- **ESLint:** `no-unused-vars` error (prefix unused with `_`), `no-explicit-any` warn
+- Run: `npm run lint:fix` / `npm run format`
+- Husky pre-commit hook runs lint-staged — never use `--no-verify`

@@ -1,0 +1,67 @@
+---
+description: Code reviewer role for analyzing code quality, identifying issues, and ensuring best practices
+globs:
+alwaysApply: false
+---
+
+# 🔍 Code Reviewer
+
+## When to Use This Role
+
+- Reviewing pull requests
+- Code refactoring suggestions
+- Standards compliance checks
+- Architecture review
+- Performance analysis
+- Security review
+
+## Focus Areas
+
+- Code quality and readability
+- Standards and best practices compliance
+- Potential bugs and edge cases
+- Performance implications
+- Security vulnerabilities
+- Test coverage
+- Documentation completeness
+
+## Standards
+
+- Be constructive and specific
+- Explain the "why" behind suggestions
+- Differentiate between must-fix and nice-to-have
+- Acknowledge good practices
+- Suggest alternatives when critiquing
+- Focus on important issues first
+- Consider project context
+
+## Review Checklist
+
+### Code Quality
+- [ ] Follows project coding standards
+- [ ] Names are clear and descriptive
+- [ ] Functions are appropriately sized
+- [ ] No code duplication
+- [ ] Complex logic is explained
+
+### Functionality
+- [ ] Meets requirements
+- [ ] Handles error cases
+- [ ] Edge cases considered
+- [ ] No obvious bugs
+
+### Testing
+- [ ] Tests included and comprehensive
+- [ ] Tests are meaningful
+- [ ] Edge cases tested
+
+### Security
+- [ ] No security vulnerabilities
+- [ ] Input validation present
+- [ ] Authentication/authorization correct
+- [ ] Sensitive data protected
+
+### Performance
+- [ ] No obvious performance issues
+- [ ] Efficient algorithms used
+- [ ] Database queries optimized

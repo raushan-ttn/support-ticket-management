@@ -1,0 +1,71 @@
+---
+description: Security analyst role for identifying vulnerabilities, ensuring secure coding practices, and reviewing authentication
+globs:
+alwaysApply: false
+---
+
+# 🔒 Security Analyst
+
+## When to Use This Role
+
+- Security reviews
+- Authentication implementation
+- Authorization logic
+- Handling sensitive data
+- API security
+- Dependency security
+- Security audits
+
+## Focus Areas
+
+- Common vulnerabilities (OWASP Top 10)
+- Secure coding practices
+- Authentication and authorization
+- Data protection and encryption
+- Input validation and sanitization
+- Dependency security
+- Security testing
+
+## Standards
+
+- Follow OWASP guidelines
+- Implement defense in depth
+- Validate all inputs
+- Use parameterized queries
+- Encrypt sensitive data
+- Use secure dependencies
+- Log security events
+- Follow principle of least privilege
+
+## Common Security Checks
+
+### Authentication
+- [ ] Strong password requirements
+- [ ] Secure session management
+- [ ] Protected credentials storage
+- [ ] MFA implementation where needed
+- [ ] Secure password reset flow
+
+### Authorization
+- [ ] Proper access controls
+- [ ] Role-based permissions
+- [ ] Resource ownership checks
+- [ ] API authentication required
+
+### Data Protection
+- [ ] Sensitive data encrypted
+- [ ] Secure data transmission (HTTPS)
+- [ ] PII handling compliant
+- [ ] Data sanitization before display
+
+### Input Validation
+- [ ] All inputs validated
+- [ ] SQL injection prevention
+- [ ] XSS prevention
+- [ ] CSRF protection
+- [ ] File upload security
+
+### Dependencies
+- [ ] No known vulnerabilities
+- [ ] Regular dependency updates
+- [ ] Security scanning enabled

@@ -1,0 +1,81 @@
+---
+description: Main project context and quick reference for AI assistance
+globs:
+alwaysApply: true
+---
+
+# Support Ticket Management — Backend (Node)
+
+> **Modular Structure:** Detailed rules live in `.cursor/rules/`. This file is the always-applied quick context.
+
+## Tech Stack
+
+- **Runtime:** Node.js 24 · **Language:** TypeScript (strict)
+- **Framework:** Express 4 · **API prefix:** `/api/v1/`
+- **Database:** PostgreSQL 16 (`ttn_stm`) · **Cache:** Redis 7 (ioredis)
+- **Auth:** passport-jwt · **Validation:** zod · **File Upload:** multer
+- **Queue:** BullMQ (uses Redis)
+
+## Architecture: Monolith Modular
+
+```
+bin/www.ts                  server bootstrap + graceful shutdown
+src/
+  app.ts                    middleware stack + route mounting
+  config/
+    index.ts                ALL env vars → typed Config (only place process.env is read)
+    postgres.ts             pg.Pool singleton: query<T>(), withTransaction()
+    redis.ts                ioredis singleton: setCache/getCache/deleteCache
+  db/
+    schema.sql              idempotent DDL — source of truth
+    migrate.ts              npm run db:migrate
+    admin-seed.ts           npm run db:seed
+  middlewares/
+    errorHandler.ts         global 4-arg error handler (always last in app.ts)
+  modules/{module}/
+    {module}.routes.ts      HTTP verb + path → controller only
+    {module}.controller.ts  parse req → call service → send response
+    {module}.service.ts     business logic + DB/cache calls
+    {module}.schemas.ts     Zod schemas + inferred types + response interfaces
+  utils/
+    response.ts             success() / error() — only way to send responses
+```
+
+**Modules:** `auth`, `users`, `tickets`, `comments`, `attachments`
+
+## Non-Negotiables (never violate)
+
+1. Never read `process.env` outside `src/config/index.ts`
+2. Never interpolate values into SQL — always use `$1, $2, ...` params
+3. Never `SELECT *` — always name columns; never return `password_hash`
+4. Never put SQL in controllers or route files
+5. Always use `success()` / `error()` from `src/utils/response.ts` — no raw `res.json()`
+6. Always `next(err)` in controller catch — never `res.status(500).json()` in catch
+7. Always `return` after calling `error()` to prevent "headers already sent"
+8. TypeScript `strict: true` — no `any`, no `!` assertion without proof
+9. Prefix unused params with `_` (`_req`, `_next`, `_filters`)
+10. Never `git commit --no-verify`
+
+## Layer Responsibilities
+
+| Layer | Responsibility | Forbidden |
+|---|---|---|
+| Routes | HTTP verb + path → middleware chain → controller | Logic, SQL |
+| Controllers | Parse `req`, call one service method, send response | SQL, `res.json()` in catch |
+| Services | Business logic, DB queries, cache, queue enqueue | `req`, `res` references |
+
+## Response Envelope (fixed)
+
+```
+Success: { "success": true,  "data": <payload|null|[]> }
+Error:   { "success": false, "message": "<string>", "code"?: "<string>" }
+```
+
+## Detailed Guidelines
+
+- **Architecture:** `.cursor/rules/architecture.mdc`
+- **Code Style & TypeScript:** `.cursor/rules/code-style.mdc`
+- **Git Workflow:** `.cursor/rules/git-workflow.mdc`
+- **Testing:** `.cursor/rules/testing.mdc`
+- **Security & RBAC:** `.cursor/rules/security.mdc`
+- **Quick Reference:** `.cursor/quick-reference.mdc`
