@@ -1,0 +1,76 @@
+{
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit*)",
+      "Bash(npm run build*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run format*)",
+      "Bash(npm run db:migrate*)",
+      "Bash(npm run db:seed*)",
+      "Bash(npm run db:setup*)",
+      "Bash(npm test*)",
+      "Bash(npm run test*)",
+      "Bash(npm run dev*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(git stash list*)",
+      "Bash(ls*)",
+      "Bash(find . *)",
+      "Bash(grep*)",
+      "mcp__postgres__list_tables",
+      "mcp__postgres__describe_table",
+      "mcp__postgres__explain_query",
+      "mcp__postgres__get_table_stats",
+      "mcp__github__list_pull_requests",
+      "mcp__github__get_pull_request",
+      "mcp__figma__get_code",
+      "mcp__figma__get_variable_defs",
+      "mcp__figma__get_screenshot"
+    ],
+    "deny": [
+      "Bash(git commit --no-verify*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(rm -rf*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/secrets/**)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Bash(psql:*)",
+      "Bash(redis-cli flushall)",
+      "Bash(redis-cli flushdb)",
+      "Bash(npm publish:*)",
+      "Bash(curl:*)",
+      "mcp__postgres__execute_query"
+    ],
+    "ask": ["mcp__github__create_pull_request", "mcp__github__merge_pull_request"]
+  },
+  "enabledMcpjsonServers": ["postgres", "github", "figma"],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsc --noEmit 2>&1 | grep -E 'error TS|Found [0-9]+ error' | head -20"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/file-review.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

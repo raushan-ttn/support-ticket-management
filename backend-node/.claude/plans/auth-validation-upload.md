@@ -1,5 +1,12 @@
 # Plan: Auth Validation, File Upload & Security Middleware Infrastructure
 
+> ### ⚠️ Reconciliation with requirements (2026-06-28)
+> This plan was written early; parts have since diverged from the canonical spec and the as-built code. Treat the following as authoritative over the body below:
+> - **No `/register` endpoint.** `requirements.md` DM-1 says users are **seeded only** — no user-management/registration API. The shipped `auth.routes.ts` correctly exposes only `POST /login` and `GET /me`. The `registerSchema`, `register()` service, and `POST /register` documented below were **not built** and must not be added.
+> - **ENUM casing is uppercase.** The Zod example using `['low','medium','high','critical']` is stale. Use `['LOW','MEDIUM','HIGH','URGENT']` per §3.2 / `schema-alignment.md` (note `URGENT`, not `critical`).
+> - **Upload middleware is superseded.** The disk-storage `upload.ts` (5 MB, JPEG/PNG/GIF/PDF hardcoded) described here is replaced by the **memory-storage, config-driven** version in `attachments-module.md` (env-driven MIME allowlist + size + per-request count, `415` on bad MIME). Use that plan for attachments.
+> - Auth/JWT/bcrypt/helmet/cors/compression/rate-limit infrastructure below is accurate and shipped.
+
 ## Scope
 Wired up Zod request validation, Passport-local + Passport-JWT authentication, bcrypt password hashing, JWT signing, Multer file uploads, a hardened global error handler, and security/performance middleware (helmet, cors, compression, express-rate-limit).
 

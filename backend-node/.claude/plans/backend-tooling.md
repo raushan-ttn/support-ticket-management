@@ -150,6 +150,8 @@ Runs on staged `*.ts` files: ESLint auto-fix → Prettier write.
 
 ## Next Steps
 
+> **⚠️ Stale (2026-06-28):** These early Next Steps predate the finalized spec and are superseded. The stack uses **PostgreSQL, not Mongoose** (TS-1; see `backend-database.md` / `backend-schema.md`), and RBAC has **two roles `ADMIN`/`AGENT`, not three** (RBAC-1 — no `user` role). Current authoritative status lives in `.claude/task.md`. Items below are kept only as a historical record.
+
 - [ ] Add database integration (Mongoose)
   - [ ] Define `User` and `Ticket` Mongoose models with TypeScript interfaces
   - [ ] Wire models into service files

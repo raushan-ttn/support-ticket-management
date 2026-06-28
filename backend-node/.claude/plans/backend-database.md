@@ -181,6 +181,8 @@ Same shape with actual credentials: `PG_PASSWORD=postgres`, `JWT_SECRET=dev_jwt_
 
 ## Next Steps
 
+> **⚠️ Stale (2026-06-28):** RBAC is **two roles (`ADMIN`/`AGENT`)** per RBAC-1 — ignore the "admin / agent / user" mention below. The app DB is **`ttn_stm`** (finalized in `backend-schema.md`), not `support_tickets` as shown earlier in this doc. Live status is tracked in `.claude/task.md`; items below are historical.
+
 - [ ] Write DB migration tooling (e.g. `node-pg-migrate` or raw SQL scripts in `src/db/migrations/`)
 - [ ] Define `users` and `tickets` table schemas and run initial migration
 - [ ] Replace stub service implementations with real `query()` calls

@@ -1,5 +1,7 @@
 # Backend Schema — PostgreSQL Tables, Migration & Admin Seed
 
+> **⚠️ This documents the INITIAL schema (pre-alignment).** The ENUMs shown here are lowercase (`admin`/`agent`/`user`, `open`…`closed`, `critical`) — the version currently in `schema.sql`. The canonical spec requires **uppercase values, two roles, a fifth `CANCELLED` status, `URGENT` (not `critical`), NOT-NULL `assigned_to`/`description`, and an `attachments` table.** Those changes are specified in **`schema-alignment.md`** and are still **pending** (not yet migrated — see `.claude/task.md` Phase 1). Read this plan together with `schema-alignment.md`.
+
 ## Goal
 
 Define the three core tables (`users`, `tickets`, `comments`) in the `ttn_stm` PostgreSQL database, provide an idempotent SQL migration file, and a TypeScript seeder that inserts the initial admin user.
