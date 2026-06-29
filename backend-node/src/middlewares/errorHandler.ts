@@ -4,6 +4,7 @@ import config from '../config';
 
 interface AppError extends Error {
   statusCode?: number;
+  code?: string;
 }
 
 const errorHandler = (
@@ -31,9 +32,11 @@ const errorHandler = (
         ? 'Internal Server Error'
         : err.message;
 
+  const code = (err as AppError).code;
   res.status(statusCode).json({
     success: false,
     message,
+    ...(code !== undefined && { code }),
     ...(config.env === 'development' && { stack: err.stack }),
   });
 };
