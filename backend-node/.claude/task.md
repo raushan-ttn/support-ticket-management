@@ -22,15 +22,15 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 1 — Database Schema & Seed
 
 - [x] Initial schema: `users`, `tickets`, `comments` tables; ENUMs; indexes; `updated_at` trigger
-- [ ] **Schema alignment** (append versioned block to `schema.sql`) — `schema-alignment.md`
-  - [ ] Migrate ENUM values to uppercase (`ADMIN`, `AGENT`, `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED`, `LOW`, `MEDIUM`, `HIGH`, `URGENT`) — SM-1, DM-*, §3
-  - [ ] Add `CANCELLED` to `ticket_status` ENUM — SM-3
-  - [ ] Replace `critical` with `URGENT` in `ticket_priority` ENUM — §3.2
-  - [ ] Remove `user` role from `user_role` ENUM — RBAC-1
-  - [ ] Make `tickets.assigned_to` NOT NULL — DM-3
-  - [ ] Make `tickets.description` NOT NULL — §3.2
-  - [ ] Add `attachments` table (id, ticket_id FK, comment_id FK nullable, filename, storage_key, mime_type, size_bytes, uploaded_by FK, created_at) — §3.4, DM-8–DM-11
-  - [ ] Add index on `attachments.ticket_id` (and `comment_id`) — DM-11
+- [x] **Schema alignment** (append versioned block to `schema.sql`) — `schema-alignment.md`
+  - [x] Migrate ENUM values to uppercase (`ADMIN`, `AGENT`, `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED`, `LOW`, `MEDIUM`, `HIGH`, `URGENT`) — SM-1, DM-*, §3
+  - [x] Add `CANCELLED` to `ticket_status` ENUM — SM-3
+  - [x] Replace `critical` with `URGENT` in `ticket_priority` ENUM — §3.2
+  - [x] Remove `user` role from `user_role` ENUM — RBAC-1
+  - [x] Make `tickets.assigned_to` NOT NULL — DM-3
+  - [x] Make `tickets.description` NOT NULL — §3.2
+  - [x] Add `attachments` table (id, ticket_id FK, comment_id FK nullable, filename, storage_key, mime_type, size_bytes, uploaded_by FK, created_at) — §3.4, DM-8–DM-11
+  - [x] Add index on `attachments.ticket_id` (and `comment_id`) — DM-11
 - [x] `src/db/migrate.ts` — run schema.sql idempotently
 - [x] `src/db/admin-seed.ts` — seeds 1 admin + 5 agents; bcrypt at 12 rounds — DM-2, TS-4
 
