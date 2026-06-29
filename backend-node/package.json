@@ -21,10 +21,13 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "globals": {
-      "ts-jest": {
-        "tsconfig": "./tsconfig.test.json"
-      }
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": "./tsconfig.test.json"
+        }
+      ]
     },
     "setupFilesAfterEnv": [
       "./jest.setup.ts"
@@ -34,7 +37,8 @@
     ],
     "collectCoverageFrom": [
       "src/**/*.ts",
-      "!src/db/**"
+      "!src/db/**",
+      "!src/**/*.test.ts"
     ]
   },
   "lint-staged": {

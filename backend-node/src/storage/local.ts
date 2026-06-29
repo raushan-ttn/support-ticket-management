@@ -30,8 +30,19 @@ export class LocalStorageBackend implements StorageBackend {
 
   async getStream(key: string): Promise<Readable> {
     const filePath = this.safePath(key);
-    await fs.promises.access(filePath, fs.constants.R_OK);
-    return fs.createReadStream(filePath);
+    try {
+      // Open the file descriptor atomically — eliminates the TOCTOU window that
+      // exists between a separate access() check and createReadStream().
+      // The FileHandle is closed automatically when the stream ends or errors.
+      const fh = await fs.promises.open(filePath, 'r');
+      return fh.createReadStream();
+    } catch (err: unknown) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') {
+        throw Object.assign(new Error('File not found'), { statusCode: 404 });
+      }
+      throw err;
+    }
   }
 
   async delete(key: string): Promise<void> {
