@@ -4,13 +4,16 @@ import { Strategy as JwtStrategy, ExtractJwt, StrategyOptionsWithoutRequest } fr
 import bcrypt from 'bcrypt';
 import { query } from './postgres';
 import config from './index';
+import { UserRole } from '../modules/auth/auth.schemas';
 
+// Raw DB row types reflect actual Postgres ENUM storage (lowercase, 3 values).
+// Normalised to uppercase 2-value UserRole at the auth boundary via normaliseRole().
 interface LocalUserRow {
   id: string;
   name: string;
   email: string;
   password_hash: string;
-  role: 'admin' | 'agent';
+  role: 'admin' | 'agent' | 'user';
   status: 'active' | 'blocked';
 }
 
@@ -18,13 +21,27 @@ interface SafeUserRow {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'agent';
+  role: 'admin' | 'agent' | 'user';
   status: 'active' | 'blocked';
+}
+
+const ROLE_MAP: Record<string, UserRole> = {
+  admin: 'ADMIN',
+  ADMIN: 'ADMIN',
+  agent: 'AGENT',
+  AGENT: 'AGENT',
+};
+
+function normaliseRole(raw: string): UserRole {
+  const mapped = ROLE_MAP[raw];
+  if (!mapped)
+    throw Object.assign(new Error(`Forbidden: unrecognised role '${raw}'`), { statusCode: 403 });
+  return mapped;
 }
 
 interface JwtPayload {
   sub: string;
-  role: 'admin' | 'agent';
+  role: 'ADMIN' | 'AGENT';
 }
 
 passport.use(
@@ -49,7 +66,7 @@ passport.use(
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: normaliseRole(user.role),
         status: user.status,
       };
       return done(null, safeUser);
@@ -74,7 +91,10 @@ passport.use(
       const user = result.rows[0];
       if (!user) return done(null, false);
       if (user.status === 'blocked') return done(null, false);
-      return done(null, user);
+      return done(null, {
+        ...user,
+        role: normaliseRole(user.role),
+      });
     } catch (err) {
       return done(err as Error);
     }

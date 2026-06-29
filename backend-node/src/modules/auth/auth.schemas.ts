@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
+export type UserRole = 'ADMIN' | 'AGENT';
+
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'agent';
+  role: UserRole;
   status: 'active' | 'blocked';
 }
 

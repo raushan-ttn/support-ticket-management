@@ -76,7 +76,7 @@ src/
 
 ## Scripts
 `npm run dev` · `npm run build` · `npm start` · `npm run lint:fix` · `npm run format`
-`npm run db:migrate` · `npm run db:seed` · `npm run db:setup` · `npm test`
+`npm run db:migrate` · `npm run db:seed` · `npm run db:setup` · `npm test` · `npm run test:watch` · `npm run test:coverage`
 
 ## Agents & Automation
 Sub-agents live in `.claude/agents/*.md` (auto-discovered — never registered in settings). They cannot call each other; the main session orchestrates the pipeline.
@@ -96,4 +96,4 @@ Sub-agents live in `.claude/agents/*.md` (auto-discovered — never registered i
 
 ## Plans
 `.claude/plans/backend-tooling.md` · `.claude/plans/backend-database.md` · `.claude/plans/backend-schema.md`
-`.claude/plans/schema-alignment.md` · `.claude/plans/auth-validation-upload.md` · `.claude/plans/tickets-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md` · `.claude/plans/testing-strategy.md`
+`.claude/plans/schema-alignment.md` · `.claude/plans/auth-validation-upload.md` · `.claude/plans/phase-0-gaps.md` · `.claude/plans/tickets-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md` · `.claude/plans/testing-strategy.md`

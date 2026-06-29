@@ -15,7 +15,7 @@ module.exports = [
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
-        project: './tsconfig.json',
+        project: ['./tsconfig.json', './tsconfig.test.json'],
       },
       globals: {
         process: 'readonly',
