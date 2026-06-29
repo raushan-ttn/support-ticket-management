@@ -1,34 +1,30 @@
-import passport from 'passport';
-import { Strategy as LocalStrategy } from 'passport-local';
-import { Strategy as JwtStrategy, ExtractJwt, StrategyOptionsWithoutRequest } from 'passport-jwt';
 import bcrypt from 'bcrypt';
-import { query } from './postgres';
-import config from './index';
+import passport from 'passport';
+import { ExtractJwt, Strategy as JwtStrategy, StrategyOptionsWithoutRequest } from 'passport-jwt';
+import { Strategy as LocalStrategy } from 'passport-local';
 import { UserRole } from '../modules/auth/auth.schemas';
+import config from './index';
+import { query } from './postgres';
 
-// Raw DB row types reflect actual Postgres ENUM storage (lowercase, 3 values).
-// Normalised to uppercase 2-value UserRole at the auth boundary via normaliseRole().
 interface LocalUserRow {
   id: string;
   name: string;
   email: string;
   password_hash: string;
-  role: 'admin' | 'agent' | 'user';
-  status: 'active' | 'blocked';
+  role: 'ADMIN' | 'AGENT';
+  status: 'ACTIVE' | 'BLOCKED';
 }
 
 interface SafeUserRow {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'agent' | 'user';
-  status: 'active' | 'blocked';
+  role: 'ADMIN' | 'AGENT';
+  status: 'ACTIVE' | 'BLOCKED';
 }
 
 const ROLE_MAP: Record<string, UserRole> = {
-  admin: 'ADMIN',
   ADMIN: 'ADMIN',
-  agent: 'AGENT',
   AGENT: 'AGENT',
 };
 
@@ -55,7 +51,7 @@ passport.use(
       if (!user) {
         return done(null, false, { message: 'Invalid email or password' });
       }
-      if (user.status === 'blocked') {
+      if (user.status === 'BLOCKED') {
         return done(null, false, { message: 'Account is blocked' });
       }
       const match = await bcrypt.compare(password, user.password_hash);
@@ -90,7 +86,7 @@ passport.use(
       );
       const user = result.rows[0];
       if (!user) return done(null, false);
-      if (user.status === 'blocked') return done(null, false);
+      if (user.status === 'BLOCKED') return done(null, false);
       return done(null, {
         ...user,
         role: normaliseRole(user.role),

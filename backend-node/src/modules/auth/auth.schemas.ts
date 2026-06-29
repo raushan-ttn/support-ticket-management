@@ -7,7 +7,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
-  status: 'active' | 'blocked';
+  status: 'ACTIVE' | 'BLOCKED';
 }
 
 export const loginSchema = z.object({
