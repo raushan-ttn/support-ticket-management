@@ -26,11 +26,13 @@ case "$FILE_PATH" in
 esac
 
 # ── 3. Build the diff ────────────────────────────────────────────────────────
-# Try HEAD diff first; fall back to staged diff for brand-new tracked files.
+# Try HEAD diff first; fall back to staged diff; then fall back to a full-file
+# diff for brand-new untracked files that have never been committed.
 DIFF=$(git diff HEAD -- "$FILE_PATH" 2>/dev/null)
 [[ -z "$DIFF" ]] && DIFF=$(git diff --cached -- "$FILE_PATH" 2>/dev/null)
+# git diff --no-index exits 1 when differences exist (always true for a new file)
+[[ -z "$DIFF" ]] && DIFF=$(git diff --no-index /dev/null "$FILE_PATH" 2>/dev/null || true)
 
-# Nothing changed in git yet (e.g., file not yet staged) — skip silently
 [[ -z "$DIFF" ]] && exit 0
 
 # Guard: skip trivially small diffs (< 3 changed lines) — not worth reviewing

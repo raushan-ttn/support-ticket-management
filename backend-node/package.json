@@ -26,9 +26,16 @@
         "tsconfig": "./tsconfig.test.json"
       }
     },
-    "setupFilesAfterEnv": ["./jest.setup.ts"],
-    "testMatch": ["**/*.test.ts"],
-    "collectCoverageFrom": ["src/**/*.ts", "!src/db/**"]
+    "setupFilesAfterEnv": [
+      "./jest.setup.ts"
+    ],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/db/**"
+    ]
   },
   "lint-staged": {
     "*.ts": [
@@ -37,6 +44,10 @@
     ]
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/lib-storage": "^3.1075.0",
+    "@types/mime-types": "^3.0.1",
+    "@types/sanitize-filename": "^1.1.28",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cookie-parser": "~1.4.6",
@@ -49,12 +60,14 @@
     "http-status-codes": "^2.3.0",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
+    "mime-types": "^3.0.2",
     "morgan": "~1.10.0",
     "multer": "^2.2.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pg": "^8.22.0",
+    "sanitize-filename": "^1.6.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
