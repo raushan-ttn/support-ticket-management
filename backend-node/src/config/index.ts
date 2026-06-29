@@ -82,7 +82,10 @@ const config: Config = {
     port: parseInt(process.env.PG_PORT || '5432', 10),
     user: process.env.PG_USER || 'postgres',
     password: process.env.PG_PASSWORD || 'postgres',
-    database: process.env.PG_DATABASE || 'ttn_stm',
+    database:
+      process.env.NODE_ENV === 'test'
+        ? process.env.PG_TEST_DATABASE || 'ttn_stm_test'
+        : process.env.PG_DATABASE || 'ttn_stm',
     poolMin: parseInt(process.env.PG_POOL_MIN || '2', 10),
     poolMax: parseInt(process.env.PG_POOL_MAX || '10', 10),
     idleTimeoutMs: parseInt(process.env.PG_IDLE_TIMEOUT_MS || '30000', 10),

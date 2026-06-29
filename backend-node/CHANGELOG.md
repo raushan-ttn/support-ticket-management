@@ -57,3 +57,38 @@ None
 None (schema-only migration; all changes are additive)
 
 ---
+
+## 2026-06-29 — Tickets Module (Phase 4)
+
+**Branch:** ticket_module
+**Requirements:** FR-1, FR-2, FR-3, FR-4, FR-5, FR-6, SM-2, RBAC-1
+
+### What was built
+Implemented the core ticket lifecycle: creation (auto-assigned to first ADMIN), listing with role-based filtering (ADMIN sees all; AGENT sees only assigned or created tickets), retrieval with 403 scope protection, partial updates (title/description/priority), and state machine-driven status transitions. Added state machine validation rejecting invalid transitions (e.g., RESOLVED→IN_PROGRESS). Implemented ticket assignment (ADMIN only) with user existence validation returning 404 for missing users. All operations cache-invalidate ticket records and related lists. Unit tests mock postgres/redis; integration tests use `ttn_stm_test` database with full endpoint coverage including 401/403/404/409 scenarios.
+
+### Files added / modified
+- `src/modules/tickets/ticket.schemas.ts` — Zod schemas (createTicketSchema, updateTicketSchema, statusTransitionSchema, assignSchema, listTicketsQuerySchema); inferred types; TicketRow and TicketListResult interfaces
+- `src/modules/tickets/ticket.service.ts` — 7 service functions: createTicket, listTickets, getTicketById, updateTicket, transitionStatus, assignTicket, systemCloseTicket (internal)
+- `src/modules/tickets/ticket.controller.ts` — 6 HTTP handlers: create, list, getById, update, transitionStatus, assign
+- `src/modules/tickets/ticket.routes.ts` — 6 routes mounted at `/api/v1/tickets`
+- `src/modules/tickets/ticket.service.test.ts` — Unit tests with mocked postgres and redis
+- `src/modules/tickets/ticket.controller.test.ts` — Integration tests with supertest and real test database
+- `src/app.ts` — Mounted tickets router at `/api/v1/tickets`
+- `src/middlewares/errorHandler.ts` — Added optional `code?: string` field to AppError interface and response envelope
+- `src/config/index.ts` — NODE_ENV=test routes to ttn_stm_test database
+
+### New API endpoints
+- `POST /api/v1/tickets` — Create new ticket (auto-assigns to first ADMIN, status=OPEN)
+- `GET /api/v1/tickets` — List tickets (ADMIN: all; AGENT: assigned/created only); supports ?status, ?priority, ?assignedTo, ?search, ?page, ?limit, ?sortBy, ?order
+- `GET /api/v1/tickets/:id` — Fetch ticket by ID (returns 404/403 on miss/scope violation)
+- `PATCH /api/v1/tickets/:id` — Update ticket title, description, or priority
+- `PATCH /api/v1/tickets/:id/status` — Transition ticket through valid state machine paths (OPEN→IN_PROGRESS→RESOLVED→CLOSED or to CANCELLED)
+- `POST /api/v1/tickets/:id/assign` — Assign ticket to user (ADMIN only; returns 404 if user not found)
+
+### New environment variables
+None
+
+### Breaking changes
+None
+
+---

@@ -15,8 +15,8 @@ npm run dev
 <!-- feature list maintained by docs-updater -->
 
 - User authentication and role-based access control (ADMIN, AGENT)
-- Ticket creation, assignment, and status transitions
-- Comments and real-time notifications
+- Ticket lifecycle management: creation, listing, retrieval, updates, assignment, and state machine status transitions
+- Comment threads with notifications
 - File attachments with storage backend abstraction
 - JWT-based session management with Passport
 - Redis caching for read-heavy operations
@@ -51,8 +51,9 @@ npm run dev
 | `POST` | `/api/v1/tickets` | Create a new ticket |
 | `GET` | `/api/v1/tickets` | List tickets (filtered by role) |
 | `GET` | `/api/v1/tickets/:id` | Fetch ticket details |
-| `PATCH` | `/api/v1/tickets/:id` | Update ticket (status, priority) |
-| `POST` | `/api/v1/tickets/:id/assign` | Assign ticket to agent (ADMIN only) |
+| `PATCH` | `/api/v1/tickets/:id` | Update ticket title, description, or priority |
+| `PATCH` | `/api/v1/tickets/:id/status` | Transition ticket status through valid state machine paths |
+| `POST` | `/api/v1/tickets/:id/assign` | Assign ticket to user (ADMIN only) |
 | `POST` | `/api/v1/tickets/:id/comments` | Add comment to ticket |
 | `GET` | `/api/v1/tickets/:id/comments` | List ticket comments |
 | `POST` | `/api/v1/tickets/:id/attachments` | Upload file attachment |

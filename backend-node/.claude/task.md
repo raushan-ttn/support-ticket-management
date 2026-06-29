@@ -55,35 +55,35 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ---
 
-## Phase 4 — Tickets Module
+## Phase 4 — Tickets Module ✅
 
-- [ ] `src/modules/tickets/ticket.schemas.ts`
-  - [ ] `createTicketSchema` (title, description, priority?) — FR-1b, VAL-2/VAL-3
-  - [ ] `updateTicketSchema` (title?, description?, priority?) with `.refine` at-least-one — FR-4
-  - [ ] `statusTransitionSchema` (status enum) — FR-5
-  - [ ] `assignSchema` (assignedTo uuid) — FR-7
-  - [ ] `listTicketsQuerySchema` (status?, priority?, search?, page, limit, sortBy, order) — SF-1–SF-4
-  - [ ] Inferred TypeScript types via `z.infer`
-  - [ ] `TicketRow` response interface (no `password_hash`)
-- [ ] `src/modules/tickets/ticket.service.ts`
-  - [ ] `createTicket()` — auto-assign to admin, force `status=OPEN`, `createdBy=caller` — FR-1, FR-1a
-  - [ ] `listTickets()` — admin sees all; agent scoped to assigned/created; RBAC filter in SQL `WHERE` — FR-2, FR-2a, RBAC-3/4, SF-5
-  - [ ] `getTicketById()` — 404 if not found, 403 if out of scope — FR-3
-  - [ ] `updateTicket()` — title/description/priority; admin-only assignee update — FR-4, FR-4a, RBAC-5
-  - [ ] `transitionStatus()` — state machine read-then-write inside `withTransaction()`, row lock `FOR UPDATE`; 409 on invalid — FR-5, SM-1–SM-5
-  - [ ] `assignTicket()` — admin only; 400 if user not found — FR-7
-  - [ ] Cache: `getCache/setCache` for `ticket:{id}`; `deleteCache` on all writes — CACHE-1, CACHE-5
-- [ ] `src/modules/tickets/ticket.controller.ts`
-  - [ ] `create`, `list`, `getById`, `update`, `transitionStatus`, `assign`
-  - [ ] All catch → `next(err)`, `return` after `error()`
-- [ ] `src/modules/tickets/ticket.routes.ts`
-  - [ ] `POST /` (`authenticate`, `validateBody`, `create`)
-  - [ ] `GET /` (`authenticate`, `validateQuery`, `list`)
-  - [ ] `GET /:id` (`authenticate`, `getById`)
-  - [ ] `PATCH /:id` (`authenticate`, `validateBody`, `update`)
-  - [ ] `PATCH /:id/status` (`authenticate`, `validateBody`, `transitionStatus`)
-  - [ ] `POST /:id/assign` (`authenticate`, `requireRole('ADMIN')`, `validateBody`, `assign`)
-- [ ] Mount tickets router in `src/app.ts` at `/api/v1/tickets`
+- [x] `src/modules/tickets/ticket.schemas.ts`
+  - [x] `createTicketSchema` (title, description, priority?) — FR-1b, VAL-2/VAL-3
+  - [x] `updateTicketSchema` (title?, description?, priority?) with `.refine` at-least-one — FR-4
+  - [x] `statusTransitionSchema` (status enum) — FR-5
+  - [x] `assignSchema` (assignedTo uuid) — FR-7
+  - [x] `listTicketsQuerySchema` (status?, priority?, search?, page, limit, sortBy, order) — SF-1–SF-4
+  - [x] Inferred TypeScript types via `z.infer`
+  - [x] `TicketRow` response interface (no `password_hash`)
+- [x] `src/modules/tickets/ticket.service.ts`
+  - [x] `createTicket()` — auto-assign to admin, force `status=OPEN`, `createdBy=caller` — FR-1, FR-1a
+  - [x] `listTickets()` — admin sees all; agent scoped to assigned/created; RBAC filter in SQL `WHERE` — FR-2, FR-2a, RBAC-3/4, SF-5
+  - [x] `getTicketById()` — 404 if not found, 403 if out of scope — FR-3
+  - [x] `updateTicket()` — title/description/priority; admin-only assignee update — FR-4, FR-4a, RBAC-5
+  - [x] `transitionStatus()` — state machine read-then-write inside `withTransaction()`, row lock `FOR UPDATE`; 409 on invalid — FR-5, SM-1–SM-5
+  - [x] `assignTicket()` — admin only; 400 if user not found — FR-7
+  - [x] Cache: `getCache/setCache` for `ticket:{id}`; `deleteCache` on all writes — CACHE-1, CACHE-5
+- [x] `src/modules/tickets/ticket.controller.ts`
+  - [x] `create`, `list`, `getById`, `update`, `transitionStatus`, `assign`
+  - [x] All catch → `next(err)`, `return` after `error()`
+- [x] `src/modules/tickets/ticket.routes.ts`
+  - [x] `POST /` (`authenticate`, `validateBody`, `create`)
+  - [x] `GET /` (`authenticate`, `validateQuery`, `list`)
+  - [x] `GET /:id` (`authenticate`, `getById`)
+  - [x] `PATCH /:id` (`authenticate`, `validateBody`, `update`)
+  - [x] `PATCH /:id/status` (`authenticate`, `validateBody`, `transitionStatus`)
+  - [x] `POST /:id/assign` (`authenticate`, `requireRole('ADMIN')`, `validateBody`, `assign`)
+- [x] Mount tickets router in `src/app.ts` at `/api/v1/tickets`
 
 ---
 

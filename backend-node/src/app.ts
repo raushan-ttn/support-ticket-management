@@ -10,6 +10,7 @@ import config from './config';
 import passport from './config/passport';
 import errorHandler from './middlewares/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
+import ticketRoutes from './modules/tickets/ticket.routes';
 import { success } from './utils/response';
 
 const app = express();
@@ -36,6 +37,7 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/tickets', ticketRoutes);
 
 app.use(errorHandler);
 
