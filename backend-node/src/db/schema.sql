@@ -8,24 +8,25 @@
 -- ─── ENUM Types ───────────────────────────────────────────────────────────────
 
 DO $$ BEGIN
-  CREATE TYPE user_role AS ENUM ('admin', 'agent', 'user');
+  CREATE TYPE user_role AS ENUM ('ADMIN', 'AGENT');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE user_status AS ENUM ('active', 'blocked');
+  CREATE TYPE user_status AS ENUM ('ACTIVE', 'BLOCKED');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE ticket_priority AS ENUM ('low', 'medium', 'high', 'critical');
+  CREATE TYPE ticket_priority AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE ticket_status AS ENUM ('open', 'in_progress', 'resolved', 'closed');
+  CREATE TYPE ticket_status AS ENUM ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
 
 -- ─── Table: users ─────────────────────────────────────────────────────────────
 -- Seeded only. No sign-up UI — admin/agent accounts are created by an admin.
@@ -35,8 +36,8 @@ CREATE TABLE IF NOT EXISTS users (
   name           VARCHAR(255) NOT NULL,
   email          VARCHAR(255) NOT NULL UNIQUE,
   password_hash  VARCHAR(255) NOT NULL,
-  role           user_role    NOT NULL DEFAULT 'user',
-  status         user_status  NOT NULL DEFAULT 'active',
+  role           user_role    NOT NULL DEFAULT 'AGENT',
+  status         user_status  NOT NULL DEFAULT 'ACTIVE',
   last_logged_in TIMESTAMPTZ,
   created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -47,8 +48,8 @@ CREATE TABLE IF NOT EXISTS tickets (
   id           UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
   title        VARCHAR(500)    NOT NULL,
   description  TEXT,
-  priority     ticket_priority NOT NULL DEFAULT 'medium',
-  status       ticket_status   NOT NULL DEFAULT 'open',
+  priority     ticket_priority NOT NULL DEFAULT 'MEDIUM',
+  status       ticket_status   NOT NULL DEFAULT 'OPEN',
   assigned_to  UUID            REFERENCES users(id) ON DELETE SET NULL,
   created_by   UUID            NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at   TIMESTAMPTZ     NOT NULL DEFAULT NOW(),

@@ -36,7 +36,7 @@ async function seedAdmin(): Promise<void> {
   const passwordHash = await bcrypt.hash(admin.password, SALT_ROUNDS);
   const result = await query<UserRow>(
     `INSERT INTO users (name, email, password_hash, role, status)
-     VALUES ($1, $2, $3, 'admin', 'active')
+     VALUES ($1, $2, $3, 'ADMIN', 'ACTIVE')
      RETURNING id`,
     [admin.name, admin.email, passwordHash],
   );
@@ -57,7 +57,7 @@ async function seedAgents(): Promise<void> {
     const passwordHash = await bcrypt.hash(agent.password, SALT_ROUNDS);
     const result = await query<UserRow>(
       `INSERT INTO users (name, email, password_hash, role, status)
-       VALUES ($1, $2, $3, 'agent', 'active')
+       VALUES ($1, $2, $3, 'AGENT', 'ACTIVE')
        RETURNING id`,
       [agent.name, agent.email, passwordHash],
     );
