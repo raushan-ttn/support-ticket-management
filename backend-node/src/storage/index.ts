@@ -13,11 +13,16 @@ export function buildStorageKey(): string {
   return `${date}/${randomUUID()}`;
 }
 
+let _backend: StorageBackend | null = null;
+
 export async function getStorageBackend(): Promise<StorageBackend> {
+  if (_backend) return _backend;
   if (config.storage.backend === 's3') {
     const { S3StorageBackend } = await import('./s3');
-    return new S3StorageBackend();
+    _backend = new S3StorageBackend();
+  } else {
+    const { LocalStorageBackend } = await import('./local');
+    _backend = new LocalStorageBackend();
   }
-  const { LocalStorageBackend } = await import('./local');
-  return new LocalStorageBackend();
+  return _backend;
 }

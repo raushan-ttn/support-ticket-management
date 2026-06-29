@@ -109,7 +109,10 @@ const config: Config = {
     allowedMimeTypes: (
       process.env.ATTACHMENT_ALLOWED_MIME_TYPES ||
       'image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain'
-    ).split(','),
+    )
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     maxFileSizeBytes: parseInt(process.env.ATTACHMENT_MAX_FILE_SIZE_BYTES || '10485760', 10), // 10 MB
     maxFilesPerRequest: parseInt(process.env.ATTACHMENT_MAX_FILES_PER_REQUEST || '5', 10),
   },
