@@ -79,16 +79,16 @@ src/
 `npm run db:migrate` · `npm run db:seed` · `npm run db:setup` · `npm test`
 
 ## Agents & Automation
-Sub-agents live in `.claude/agents/*.md` (auto-discovered — never registered in settings). They cannot call each other; the main session orchestrates the pipeline.
+Sub-agents live in `.claude/agents/*.md` (auto-discovered — never registered in settings). They cannot call each other; the main session orchestrates the pipeline. Per-agent skill references live in `.claude/agents/skills/` (index: `.claude/agents/skills/README.md`).
 
-| Agent | Model | Role |
-|-------|-------|------|
-| `requirement-fetcher` | Haiku | Extract relevant spec from `requirements.md` + `task.md` (with done/pending status) |
-| `feature-planner` | Sonnet | File-level plan → `.claude/plans/{slug}.md` (planning only) |
-| `feature-implementer` | Sonnet | Implement from plan; run tsc/lint/test; check off `task.md` items |
-| `code-reviewer` | Opus | Review a single-file diff against these conventions |
-| `docs-updater` | Haiku | Update `CHANGELOG.md`, `README.md`, `CLAUDE.md` Plans/Scripts |
-| `feature-doc-writer` | Sonnet | Write `documents/{slug}.md` feature reference |
+| Agent | Model | Role | Skills |
+|-------|-------|------|--------|
+| `requirement-fetcher` | Haiku | Extract relevant spec from `requirements.md` + `task.md` (with done/pending status) | `skills/requirement-fetcher-skills.md` |
+| `feature-planner` | Sonnet | File-level plan → `.claude/plans/{slug}.md` (planning only) | `skills/feature-planner-skills.md` |
+| `feature-implementer` | Sonnet | Implement from plan; run tsc/lint/test; check off `task.md` items | `skills/feature-implementer-skills.md` |
+| `code-reviewer` | Opus | Review a single-file diff against these conventions | `skills/code-reviewer-skills.md` |
+| `docs-updater` | Haiku | Update `CHANGELOG.md`, `README.md`, `CLAUDE.md` Plans/Scripts | `skills/docs-updater-skills.md` |
+| `feature-doc-writer` | Sonnet | Write `documents/{slug}.md` feature reference | `skills/feature-doc-writer-skills.md` |
 
 - **`/build-feature <name>`** (`.claude/commands/build-feature.md`) runs the full chain: requirements → plan → implement → review → docs, with checkpoints after plan and after implementation.
 - **`code-reviewer` is hook-driven**: `settings.json` `PostToolUse` → `.claude/hooks/file-review.sh` auto-reviews every `.ts`/`.js` Edit/Write. All other agents are invoked on demand via the Agent tool.

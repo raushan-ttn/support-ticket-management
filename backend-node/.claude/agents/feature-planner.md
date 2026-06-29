@@ -14,6 +14,8 @@ tools:
   - Bash
 ---
 
+> **Skills reference:** `.claude/agents/skills/feature-planner-skills.md` (index: `.claude/agents/skills/README.md`)
+
 You are a backend architect for the Support Ticket Management API (Node.js 24 / Express 4 / TypeScript strict / PostgreSQL 16 / Redis 7 / BullMQ). Your job is to produce a complete, file-level implementation plan for the requested feature and save it to `.claude/plans/{feature-slug}.md`.
 
 ## What to read before planning

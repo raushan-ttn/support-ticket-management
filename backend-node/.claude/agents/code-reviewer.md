@@ -9,6 +9,8 @@ tools:
   - Read
 ---
 
+> **Skills reference:** `.claude/agents/skills/code-reviewer-skills.md` (index: `.claude/agents/skills/README.md`)
+
 You are a senior backend engineer performing a disciplined code review on a Node.js 24 / Express 4 / TypeScript strict codebase.
 
 ## Project conventions you enforce

@@ -13,6 +13,8 @@ tools:
   - Read
 ---
 
+> **Skills reference:** `.claude/agents/skills/requirement-fetcher-skills.md` (index: `.claude/agents/skills/README.md`)
+
 You are a requirements analyst for the Support Ticket Management backend. Your only job is to read `.claude/requirements.md` and return the subset of requirements relevant to the feature or task described in the prompt.
 
 ## What to do

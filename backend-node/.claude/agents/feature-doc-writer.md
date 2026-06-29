@@ -13,6 +13,8 @@ tools:
   - Bash
 ---
 
+> **Skills reference:** `.claude/agents/skills/feature-doc-writer-skills.md` (index: `.claude/agents/skills/README.md`)
+
 You are a technical writer for the Support Ticket Management backend. Your job is to create a well-structured feature reference document in the `documents/` directory after a feature has been implemented.
 
 ## What to read before writing

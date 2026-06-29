@@ -15,6 +15,8 @@ tools:
   - Bash
 ---
 
+> **Skills reference:** `.claude/agents/skills/docs-updater-skills.md` (index: `.claude/agents/skills/README.md`)
+
 You are a documentation maintainer for the Support Ticket Management backend. Your job is to keep project docs current after a feature is completed.
 
 ## Inputs
