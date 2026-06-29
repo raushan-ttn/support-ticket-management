@@ -49,9 +49,9 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Phase 3 — Config Additions & Queue Setup
 
-- [ ] Extend `src/config/index.ts` with SMTP, BullMQ, storage, and attachment-limit config sections — TS-7, TS-8, TS-9, VAL-6 *(storage + attachment limits done; SMTP + BullMQ pending)*
+- [x] Extend `src/config/index.ts` with SMTP, BullMQ, storage, and attachment-limit config sections — TS-7, TS-8, TS-9, VAL-6
 - [x] Add storage + attachment-limit vars to `.sample.env` — TS-9, VAL-6
-- [ ] `src/config/queue.ts` — BullMQ `ConnectionOptions` (dedicated ioredis connection, NOT the cache singleton) — TS-8, db-conventions.md
+- [x] `src/config/queue.ts` — BullMQ `ConnectionOptions` (dedicated ioredis connection, NOT the cache singleton) — TS-8, db-conventions.md
 
 ---
 
