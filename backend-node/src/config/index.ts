@@ -35,6 +35,22 @@ interface Config {
     secret: string;
     expiresIn: string;
   };
+  storage: {
+    backend: 'local' | 's3';
+    localDir: string;
+    s3: {
+      bucket: string;
+      region: string;
+      accessKeyId: string;
+      secretAccessKey: string;
+      endpoint: string | undefined;
+    };
+  };
+  attachment: {
+    allowedMimeTypes: string[];
+    maxFileSizeBytes: number;
+    maxFilesPerRequest: number;
+  };
 }
 
 const config: Config = {
@@ -75,6 +91,27 @@ const config: Config = {
   jwt: {
     secret: process.env.JWT_SECRET || 'changeme',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
+
+  storage: {
+    backend: (process.env.STORAGE_BACKEND as 'local' | 's3') || 'local',
+    localDir: process.env.STORAGE_LOCAL_DIR || 'public',
+    s3: {
+      bucket: process.env.S3_BUCKET || '',
+      region: process.env.S3_REGION || 'us-east-1',
+      accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+      endpoint: process.env.S3_ENDPOINT || undefined,
+    },
+  },
+
+  attachment: {
+    allowedMimeTypes: (
+      process.env.ATTACHMENT_ALLOWED_MIME_TYPES ||
+      'image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain'
+    ).split(','),
+    maxFileSizeBytes: parseInt(process.env.ATTACHMENT_MAX_FILE_SIZE_BYTES || '10485760', 10), // 10 MB
+    maxFilesPerRequest: parseInt(process.env.ATTACHMENT_MAX_FILES_PER_REQUEST || '5', 10),
   },
 };
 

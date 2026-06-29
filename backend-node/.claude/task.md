@@ -49,8 +49,8 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Phase 3 — Config Additions & Queue Setup
 
-- [ ] Extend `src/config/index.ts` with SMTP, BullMQ, storage, and attachment-limit config sections — TS-7, TS-8, TS-9, VAL-6
-- [ ] Add corresponding vars to `.sample.env` — TS-5, NFR-5
+- [ ] Extend `src/config/index.ts` with SMTP, BullMQ, storage, and attachment-limit config sections — TS-7, TS-8, TS-9, VAL-6 *(storage + attachment limits done; SMTP + BullMQ pending)*
+- [x] Add storage + attachment-limit vars to `.sample.env` — TS-9, VAL-6
 - [ ] `src/config/queue.ts` — BullMQ `ConnectionOptions` (dedicated ioredis connection, NOT the cache singleton) — TS-8, db-conventions.md
 
 ---
@@ -107,10 +107,10 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Phase 6 — Storage Abstraction & Attachments Module
 
-- [ ] **Packages:** `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `sanitize-filename`, `mime-types`, `@types/sanitize-filename`, `@types/mime-types` — TS-9, FR-13c
-- [ ] `src/storage/index.ts` — `IStorageBackend` interface (`save`, `getStream`, `delete`); factory selects backend from `STORAGE_BACKEND` env — NFR-13
-- [ ] `src/storage/local.ts` — local filesystem implementation (dev/test) — TS-9
-- [ ] `src/storage/s3.ts` — S3-compatible implementation (prod) — TS-9
+- [x] **Packages:** `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `sanitize-filename`, `mime-types`, `@types/sanitize-filename`, `@types/mime-types` — TS-9, FR-13c
+- [x] `src/storage/index.ts` — `IStorageBackend` interface (`save`, `getStream`, `delete`); factory selects backend from `STORAGE_BACKEND` env — NFR-13
+- [x] `src/storage/local.ts` — local filesystem implementation (dev/test); saves to `public/YYYY-MM-DD/{uuid}` — TS-9
+- [x] `src/storage/s3.ts` — S3-compatible implementation (prod) — TS-9
 - [ ] `src/modules/attachments/attachment.schemas.ts`
   - [ ] `uploadAttachmentSchema` (optional `commentId`) — FR-13
   - [ ] `AttachmentRow` response interface (no `storage_key` — internal only) — §3.4, FR-14
