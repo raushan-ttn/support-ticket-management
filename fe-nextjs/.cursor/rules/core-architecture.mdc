@@ -1,0 +1,58 @@
+---
+description: Core engineering principles, TypeScript, RSC/Client model, routing, data fetching, RTK Query/Redux — always applied
+alwaysApply: true
+---
+
+# Core & Architecture
+
+You are a Senior Principal Next.js Engineer.
+Stack: TypeScript · Next.js 16 App Router · React 19 · Redux Toolkit · RTK Query (client-only) · MUI v9 + `@mui/material-nextjs` · Zod · react-hook-form · SCSS Modules · Tailwind v4.
+
+## Principles
+- RSC by default; add `'use client'` only for hooks, events, browser APIs, or client-only libs.
+- Read related files and trace data flow before coding. Follow existing patterns; make minimal, targeted changes. No needless rewrites, regressions, or overengineering. No new libraries unless required.
+- Rendering: needs `useState`/effects/events/browser APIs → Client; else Server (default).
+- Fetching: Server Component → `async` + `fetch()` with cache opts; Client Component → RTK Query hook.
+
+## TypeScript
+- No `any` (use `unknown` + narrow). Strongly type props, API responses, hooks, returns. `interface` for object shapes; `readonly` for immutables; `const` over `let`.
+- Use `?.` / `??`. No enums — use `as const` objects or string unions. Explicit return types when non-obvious (incl. async RSC and Server Actions).
+- Naming: PascalCase (components/types/classes), camelCase (functions/vars/hooks), kebab-case (files/folders), UPPER_CASE (constants/env), booleans prefixed `is`/`has`/`can`/`should`.
+- Single-responsibility functions, early returns, no dead code, no magic values, no `console.log` in prod.
+- Props as a named `interface`, never inline. Always import via `@/` alias, never relative `../../`.
+
+## Server Components
+- Default to RSC. Props must be serializable (no functions/class instances — callbacks require a Client child).
+- Fetch in the body with `async/await` + `fetch()` (never RTK Query). Throw on failure → nearest `error.tsx`. Parallelize independent fetches with `Promise.all`.
+- Never: `'use client'` "to be safe", `useEffect` fetching, `localStorage`/`window` access, or `useRouter`/`usePathname`/`useSearchParams` (all crash/invalid in RSC).
+
+## Client Components
+- Client when using hooks, events, browser APIs, or client-only libs (MUI interactive, react-hook-form, Redux hooks).
+- `'use client'` on the very first line, before imports.
+- Push the boundary DOWN: page stays a Server Component rendering a small Client leaf, not the reverse.
+- Pass server data as serializable props; pass RSC subtrees as `children` to keep them server-rendered inside a Client shell.
+- `AppRouterCacheProvider` + `StoreProvider` already wired in `src/app/layout.tsx`.
+- Server Actions may be imported/called from Client Components; never import DB/`server-only` modules (leaks server code into the bundle).
+- Structure: functional only, one component/file, kebab-case filename, named exports (`default` only for `page`/`layout`/`error`), co-located `*.module.scss`.
+
+## App Router
+- Segment files under `src/app/`: `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx` (must be Client), `not-found.tsx`, `template.tsx` (remounts), `route.ts` (API, no UI).
+- Add a route = create `page.tsx` with a default export + `metadata`; filesystem is the router.
+- `params` and `searchParams` are Promises — await them.
+- `<Link>` for internal nav (never `<a>`). Client nav hooks (`useRouter`/`usePathname`/`useSearchParams`) are client-only. Server nav: `redirect()` (307), `permanentRedirect()` (308), `notFound()`.
+- Root layout holds the providers; nest `layout.tsx` per folder; don't fetch page-specific data in a layout (runs on every child render).
+- Use `(group)` folders to organize without URL impact; prefer over deep nesting. Patterns: `[param]`, `[...slug]`, `[[...slug]]`, `(group)`, `@slot`, `(.)intercept`.
+
+## Data Fetching
+- Same for all users + pre-buildable → Static (default) or ISR (`next.revalidate`). Not pre-buildable, or user-specific → Dynamic (`cache: 'no-store'` / `export const dynamic = 'force-dynamic'`).
+- Reacts to interaction after load → RTK Query (Client); else `fetch()` (Server).
+- `fetch()` modes: `force-cache` (static), `next: { revalidate, tags }` (ISR + on-demand), `no-store` (dynamic). Segment config: `dynamic`, `revalidate`, `fetchCache`. Wrap expensive non-fetch work in `unstable_cache` with `revalidate`/`tags`.
+- RTK Query (client-only): live updates/polling, optimistic updates, post-mutation invalidation, user-triggered refetch.
+
+## RTK Query & Redux
+- Setup: `src/services/baseApi.ts` (`createApi` + `fetchBaseQuery` + Bearer auth), `makeStore()` in `src/lib/store/index.ts`, `StoreProvider` (`'use client'`, store once via `useRef`) in root layout; tag types `Ticket`, `Comment`.
+- Add services via `injectEndpoints` on `baseApi` — never a new `createApi()`; injected endpoints share `baseApi`'s reducer (no new reducer path).
+- Cache tags: list queries provide per-item tags + a `LIST` tag; create invalidates `LIST`; update/delete invalidate the item + `LIST`.
+- Use typed `useAppDispatch`/`useAppSelector` everywhere, not raw hooks.
+- Slices for UI state only (auth, toggles, persisted filters); never mirror RTK Query cache — it is the single source of truth for server state.
+- Auth token read from `localStorage` in `baseApi.ts` `prepareHeaders` (XSS risk; planned `httpOnly` cookie migration). Extend that pattern only — no parallel token storage. See `performance-security`.
