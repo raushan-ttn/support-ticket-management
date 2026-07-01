@@ -75,15 +75,20 @@ Declared with `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$
 | ------------- | ---------------- | ---------------------------------------- | ------------------- |
 | `id`          | `UUID`           | PK                                       | `gen_random_uuid()` |
 | `title`       | `VARCHAR(500)`   | NOT NULL                                 |                     |
-| `description` | `TEXT`           | nullable                                 |                     |
-| `priority`    | `ticket_priority`| NOT NULL                                 | `'medium'`          |
-| `status`      | `ticket_status`  | NOT NULL                                 | `'open'`            |
-| `assigned_to` | `UUID`           | FK → `users.id` ON DELETE SET NULL       |                     |
-| `created_by`  | `UUID`           | NOT NULL, FK → `users.id` ON DELETE RESTRICT |                 |
+| `description` | `TEXT`           | NOT NULL                                 |                     |
+| `type`        | `VARCHAR(100)`   | nullable — ticket classification         |                     |
+| `sub_type`    | `VARCHAR(100)`   | nullable — ticket sub-classification     |                     |
+| `screenshot`  | `TEXT`           | nullable — URL string (not a storage key)|                     |
+| `priority`    | `ticket_priority`| NOT NULL                                 | `'MEDIUM'`          |
+| `status`      | `ticket_status`  | NOT NULL                                 | `'OPEN'`            |
+| `assigned_to` | `UUID`           | NOT NULL, FK → `users.id` ON DELETE RESTRICT |               |
+| `created_by`  | `UUID`           | NOT NULL, FK → `users.id` ON DELETE RESTRICT |               |
 | `created_at`  | `TIMESTAMPTZ`    | NOT NULL                                 | `NOW()`             |
 | `updated_at`  | `TIMESTAMPTZ`    | NOT NULL                                 | `NOW()`             |
 
 > `updated_at` is maintained automatically by the `tickets_set_updated_at` trigger.
+> `type`/`sub_type` use free-text (no ENUM) so new categories need no schema changes (DM-12).
+> `screenshot` stores a plain URL; it is unrelated to the binary `attachments` table (DM-13).
 
 ---
 
@@ -94,6 +99,7 @@ Declared with `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$
 | `id`         | `UUID`       | PK                                       | `gen_random_uuid()` |
 | `ticket_id`  | `UUID`       | NOT NULL, FK → `tickets.id` ON DELETE CASCADE |                |
 | `message`    | `TEXT`       | NOT NULL                                 |                     |
+| `screenshot` | `TEXT`       | nullable — URL string (see DM-13)        |                     |
 | `created_by` | `UUID`       | NOT NULL, FK → `users.id` ON DELETE RESTRICT |               |
 | `created_at` | `TIMESTAMPTZ`| NOT NULL                                 | `NOW()`             |
 
@@ -107,6 +113,8 @@ Declared with `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$
 | `idx_tickets_priority`   | `tickets`  | `priority`    | Filter by priority             |
 | `idx_tickets_created_by` | `tickets`  | `created_by`  | Tickets by reporter            |
 | `idx_tickets_assigned_to`| `tickets`  | `assigned_to` | Tickets by assignee            |
+| `idx_tickets_type`       | `tickets`  | `type`        | Filter/group by ticket type    |
+| `idx_tickets_sub_type`   | `tickets`  | `sub_type`    | Filter/group by sub-type       |
 | `idx_comments_ticket_id` | `comments` | `ticket_id`   | All comments on a ticket       |
 | `idx_comments_created_by`| `comments` | `created_by`  | Comments by a specific user    |
 

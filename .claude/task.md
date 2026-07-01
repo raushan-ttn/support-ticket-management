@@ -31,8 +31,10 @@ Traceable to `requirements.md`. Check off items as they are completed.
   - [x] Make `tickets.description` NOT NULL — §3.2
   - [x] Add `attachments` table (id, ticket_id FK, comment_id FK nullable, filename, storage_key, mime_type, size_bytes, uploaded_by FK, created_at) — §3.4, DM-8–DM-11
   - [x] Add index on `attachments.ticket_id` (and `comment_id`) — DM-11
+  - [x] **Schema migration 2026-07-01:** add `type VARCHAR(100)`, `sub_type VARCHAR(100)`, `screenshot TEXT` (nullable) to `tickets`; add `screenshot TEXT` (nullable) to `comments`; add indexes on `tickets.type` and `tickets.sub_type` — DM-12, DM-13
 - [x] `src/db/migrate.ts` — run schema.sql idempotently
 - [x] `src/db/admin-seed.ts` — seeds 1 admin + 5 agents; bcrypt at 12 rounds — DM-2, TS-4
+- [x] `src/db/tickets-seed.ts` — seeds 10 realistic tickets (with type/subType) + 2-3 comments each — TS-4
 
 ---
 
@@ -58,13 +60,13 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 4 — Tickets Module ✅
 
 - [x] `src/modules/tickets/ticket.schemas.ts`
-  - [x] `createTicketSchema` (title, description, priority?) — FR-1b, VAL-2/VAL-3
-  - [x] `updateTicketSchema` (title?, description?, priority?) with `.refine` at-least-one — FR-4
+  - [x] `createTicketSchema` (title, description, priority?, type?, subType?, screenshot?) — FR-1b, VAL-2/VAL-3, DM-12/DM-13
+  - [x] `updateTicketSchema` (title?, description?, priority?, type?, subType?, screenshot?) with `.refine` at-least-one — FR-4, DM-12/DM-13
   - [x] `statusTransitionSchema` (status enum) — FR-5
   - [x] `assignSchema` (assignedTo uuid) — FR-7
-  - [x] `listTicketsQuerySchema` (status?, priority?, search?, page, limit, sortBy, order) — SF-1–SF-4
+  - [x] `listTicketsQuerySchema` (status?, priority?, type?, search?, page, limit, sortBy, order) — SF-1–SF-4, DM-12
   - [x] Inferred TypeScript types via `z.infer`
-  - [x] `TicketRow` response interface (no `password_hash`)
+  - [x] `TicketRow` response interface with `type`, `subType`, `screenshot` (nullable strings)
 - [x] `src/modules/tickets/ticket.service.ts`
   - [x] `createTicket()` — auto-assign to admin, force `status=OPEN`, `createdBy=caller` — FR-1, FR-1a
   - [x] `listTickets()` — admin sees all; agent scoped to assigned/created; RBAC filter in SQL `WHERE` — FR-2, FR-2a, RBAC-3/4, SF-5
@@ -90,8 +92,8 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 5 — Comments Module
 
 - [ ] `src/modules/comments/comment.schemas.ts`
-  - [ ] `createCommentSchema` (message non-empty) — FR-8, VAL-2
-  - [ ] `CommentRow` response interface
+  - [ ] `createCommentSchema` (message non-empty, screenshot? URL) — FR-8, VAL-2, DM-13
+  - [ ] `CommentRow` response interface — include `screenshot: string | null`
 - [ ] `src/modules/comments/comment.service.ts`
   - [ ] `addComment()` — verify ticket exists (404); verify caller scope (403); insert; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, CACHE-5, FR-11
   - [ ] `listComments()` — admin sees all; agent scoped; ordered by `created_at ASC` — FR-9, FR-6, RBAC-3/4

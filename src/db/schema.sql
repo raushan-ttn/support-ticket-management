@@ -150,3 +150,21 @@ CREATE TABLE IF NOT EXISTS attachments (
 -- DM-11: Indexes to support listing attachments per ticket and per comment without full scans.
 CREATE INDEX IF NOT EXISTS idx_attachments_ticket_id  ON attachments(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_comment_id ON attachments(comment_id);
+
+-- =============================================================================
+-- Migration 2026-07-01: Add type, sub_type, screenshot to tickets; screenshot to comments
+-- Requirements: DM-12, DM-13
+-- =============================================================================
+
+-- Gap 6: Ticket classification fields — nullable free-text (no ENUM; values are application-governed).
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS type VARCHAR(100);
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sub_type VARCHAR(100);
+
+-- Gap 7: Optional screenshot URL on tickets and comments — stores a URL string, not a storage key.
+-- This is distinct from the attachments system (which stores binary files in the storage backend).
+ALTER TABLE tickets  ADD COLUMN IF NOT EXISTS screenshot TEXT;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS screenshot TEXT;
+
+-- Indexes to support filtering and grouping tickets by classification.
+CREATE INDEX IF NOT EXISTS idx_tickets_type     ON tickets(type);
+CREATE INDEX IF NOT EXISTS idx_tickets_sub_type ON tickets(sub_type);
