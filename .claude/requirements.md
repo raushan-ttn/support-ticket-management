@@ -65,6 +65,9 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 | id          | UUID / serial | PK |
 | title       | string | NOT NULL, non-empty after trim |
 | description | text | NOT NULL, non-empty after trim |
+| type        | string (max 100) | NULLABLE — ticket classification (e.g. `BUG`, `FEATURE_REQUEST`, `SUPPORT`, `INCIDENT`) |
+| subType     | string (max 100) | NULLABLE — sub-classification (e.g. `UI`, `API`, `AUTHENTICATION`, `EMAIL`) |
+| screenshot  | string (URL) | NULLABLE — URL of a screenshot linked to the ticket |
 | priority    | enum(`LOW`, `MEDIUM`, `HIGH`, `URGENT`) | NOT NULL, default `MEDIUM` |
 | status      | enum(`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED`) | NOT NULL, default `OPEN` |
 | assignedTo  | FK → User.id | **NOT NULL** (always set on creation — see FR-1) |
@@ -75,15 +78,18 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 - **DM-3:** `assignedTo` is non-nullable as a direct consequence of auto-assignment (FR-1); a ticket is never in an "unassigned" state.
 - **DM-4:** `assignedTo` and `createdBy` must reference existing users (FK enforced).
 - **DM-5:** Index `status` and `assignedTo` to support filtering (§6) without full scans.
+- **DM-12:** `type` and `subType` are nullable free-text fields (`VARCHAR(100)`); valid values are application-governed (no DB ENUM) so new categories can be added without schema changes. Index both for filter support.
+- **DM-13:** `screenshot` on `tickets` and `comments` stores a plain URL string — it is not a storage key and is entirely separate from the `attachments` system (§3.4). Bytes are never stored; only the URL is persisted.
 
 ### 3.3 `Comment`
-| Field     | Type | Constraints |
-|-----------|------|-------------|
-| id        | UUID / serial | PK |
-| ticketId  | FK → Ticket.id | NOT NULL |
-| message   | text | NOT NULL, non-empty after trim |
-| createdBy | FK → User.id | NOT NULL |
-| createdAt | timestamptz | NOT NULL, set on insert |
+| Field      | Type | Constraints |
+|------------|------|-------------|
+| id         | UUID / serial | PK |
+| ticketId   | FK → Ticket.id | NOT NULL |
+| message    | text | NOT NULL, non-empty after trim |
+| screenshot | string (URL) | NULLABLE — URL of a screenshot attached to this comment (see DM-13) |
+| createdBy  | FK → User.id | NOT NULL |
+| createdAt  | timestamptz | NOT NULL, set on insert |
 
 - **DM-6:** Deleting a ticket (if ever supported) cascades to its comments. Deletion is out of scope for Core.
 - **DM-7:** Index `ticketId` to support comment retrieval per ticket.

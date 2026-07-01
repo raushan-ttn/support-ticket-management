@@ -38,6 +38,9 @@ const TICKET_SELECT = `
   t.id,
   t.title,
   t.description,
+  t.type,
+  t.sub_type AS "subType",
+  t.screenshot,
   t.priority,
   t.status,
   t.assigned_to AS "assignedTo",
@@ -51,6 +54,9 @@ const TICKET_RETURNING = `
   id,
   title,
   description,
+  type,
+  sub_type AS "subType",
+  screenshot,
   priority,
   status,
   assigned_to AS "assignedTo",
@@ -89,10 +95,19 @@ export async function createTicket(
   const adminId = adminResult.rows[0].id;
 
   const insertResult = await query<{ id: string }>(
-    `INSERT INTO tickets (title, description, priority, status, assigned_to, created_by)
-     VALUES ($1, $2, $3, 'OPEN', $4, $5)
+    `INSERT INTO tickets (title, description, type, sub_type, screenshot, priority, status, assigned_to, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', $7, $8)
      RETURNING id`,
-    [payload.title, payload.description, payload.priority, adminId, creatorId],
+    [
+      payload.title,
+      payload.description,
+      payload.type ?? null,
+      payload.subType ?? null,
+      payload.screenshot ?? null,
+      payload.priority,
+      adminId,
+      creatorId,
+    ],
   );
   const ticketId = insertResult.rows[0].id;
 
@@ -113,7 +128,7 @@ export async function listTickets(
   callerRole: string,
   filters: ListTicketsQuery,
 ): Promise<TicketListResult> {
-  const { status, priority, assignedTo, search, page, limit, sortBy, order } = filters;
+  const { status, priority, assignedTo, type, search, page, limit, sortBy, order } = filters;
 
   const params: unknown[] = [];
   const conditions: string[] = [];
@@ -136,6 +151,11 @@ export async function listTickets(
   if (assignedTo) {
     params.push(assignedTo);
     conditions.push(`t.assigned_to = $${params.length}`);
+  }
+
+  if (type) {
+    params.push(type);
+    conditions.push(`t.type = $${params.length}`);
   }
 
   if (search) {
@@ -244,6 +264,18 @@ export async function updateTicket(
       params.push(payload.priority);
       setClauses.push(`priority = $${params.length}`);
     }
+    if (payload.type !== undefined) {
+      params.push(payload.type);
+      setClauses.push(`type = $${params.length}`);
+    }
+    if (payload.subType !== undefined) {
+      params.push(payload.subType);
+      setClauses.push(`sub_type = $${params.length}`);
+    }
+    if (payload.screenshot !== undefined) {
+      params.push(payload.screenshot);
+      setClauses.push(`screenshot = $${params.length}`);
+    }
 
     if (setClauses.length === 0)
       throw createHttpError('At least one field required', 400, 'VALIDATION_ERROR');
@@ -255,11 +287,12 @@ export async function updateTicket(
       params,
     );
 
-    const updated = updateResult.rows[0];
+    if (!updateResult.rowCount || updateResult.rowCount === 0)
+      throw createHttpError('Ticket not found', 404, 'NOT_FOUND');
 
     await invalidateTicketCache(id);
 
-    return updated;
+    return updateResult.rows[0];
   });
 }
 

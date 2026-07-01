@@ -4,6 +4,7 @@
 #
 # Invoked by Claude Code after every Edit/Write tool call.
 # Exits 0 always — never blocks the main session.
+# Output must be JSON {message: "..."} so Claude Code injects it back into the session.
 
 set -uo pipefail
 
@@ -26,11 +27,8 @@ case "$FILE_PATH" in
 esac
 
 # ── 3. Build the diff ────────────────────────────────────────────────────────
-# Try HEAD diff first; fall back to staged diff; then fall back to a full-file
-# diff for brand-new untracked files that have never been committed.
 DIFF=$(git diff HEAD -- "$FILE_PATH" 2>/dev/null)
 [[ -z "$DIFF" ]] && DIFF=$(git diff --cached -- "$FILE_PATH" 2>/dev/null)
-# git diff --no-index exits 1 when differences exist (always true for a new file)
 [[ -z "$DIFF" ]] && DIFF=$(git diff --no-index /dev/null "$FILE_PATH" 2>/dev/null || true)
 
 [[ -z "$DIFF" ]] && exit 0
@@ -43,11 +41,9 @@ CHANGED_LINES=$(echo "$DIFF" | grep -c '^[+-]' 2>/dev/null || echo 0)
 AGENT_FILE=".claude/agents/code-reviewer.md"
 
 if [[ ! -f "$AGENT_FILE" ]]; then
-  echo "[file-review hook] Agent file not found: $AGENT_FILE — skipping review." >&2
   exit 0
 fi
 
-# Extract: model from frontmatter, system prompt from body (after second ---)
 MODEL=$(awk '/^model:/{print $2; exit}' "$AGENT_FILE")
 SYSTEM_PROMPT=$(awk 'BEGIN{c=0} /^---$/{c++; if(c==2){found=1; next}} found{print}' "$AGENT_FILE")
 [[ -z "$MODEL" ]] && MODEL="claude-haiku-4-5-20251001"
@@ -60,11 +56,6 @@ ${DIFF}
 \`\`\`"
 
 # ── 6. Invoke sub-agent ──────────────────────────────────────────────────────
-# --print           : non-interactive, output to stdout
-# --model           : read from agent frontmatter
-# --allowedTools    : restrict to Read only — sub-agent cannot Edit/Write,
-#                     so this hook can never fire recursively
-# Input via stdin so the diff never appears as a shell argument
 REVIEW=$(echo "$PROMPT" \
   | claude \
       --print \
@@ -73,13 +64,13 @@ REVIEW=$(echo "$PROMPT" \
       --allowedTools "Read" \
   2>/dev/null) || true
 
-# ── 7. Print — only if there is actual output ────────────────────────────────
+# ── 7. Output as JSON so Claude Code injects it into the session ─────────────
+# PostToolUse hook stdout must be {"message":"..."} to be shown in the UI.
 if [[ -n "$REVIEW" ]]; then
   BASENAME=$(basename "$FILE_PATH")
-  echo ""
-  echo "┌── code-reviewer: ${BASENAME} $(printf '─%.0s' {1..50} | head -c $((55 - ${#BASENAME})))"
-  echo "$REVIEW" | sed 's/^/│ /'
-  echo "└$(printf '─%.0s' {1..60})"
+  HEADER="code-reviewer: ${BASENAME}"
+  BODY=$(printf '%s\n%s' "$HEADER" "$REVIEW")
+  printf '%s' "$BODY" | jq -Rs '{"message": .}'
 fi
 
 exit 0

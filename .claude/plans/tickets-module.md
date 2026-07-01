@@ -32,29 +32,41 @@ Follow the existing `auth` module as the structural pattern: `routes → control
 
 ## Schema Changes
 
-**None required.** `schema.sql` already has:
-- `tickets` table with all needed columns (id, title, description, priority, status, assigned_to, created_by, created_at, updated_at)
-- All ENUMs (ticket_status, ticket_priority) with correct uppercase values
-- `updated_at` trigger on `tickets`
-- Indexes on `status`, `assigned_to`
+Migration 2026-07-01 added three nullable columns to `tickets` and one to `comments` (DM-12, DM-13):
+
+| Table      | Column       | Type           | Notes |
+|------------|------------- |--------------- |-------|
+| `tickets`  | `type`       | `VARCHAR(100)` | nullable — free-text classification (BUG, FEATURE_REQUEST …) |
+| `tickets`  | `sub_type`   | `VARCHAR(100)` | nullable — sub-classification (UI, API, AUTHENTICATION …) |
+| `tickets`  | `screenshot` | `TEXT`         | nullable — plain URL; NOT a storage key |
+| `comments` | `screenshot` | `TEXT`         | nullable — plain URL; NOT a storage key |
+
+Indexes `idx_tickets_type` and `idx_tickets_sub_type` support filter queries.
+Free-text (no ENUM) keeps category management schema-free.
 
 ---
 
 ## Zod Schemas (`ticket.schemas.ts`)
 
 ```ts
-// Create — FR-1b, VAL-2/VAL-3
+// Create — FR-1b, VAL-2/VAL-3, DM-12/DM-13
 export const createTicketSchema = z.object({
   title:       z.string().trim().min(1).max(500),
   description: z.string().trim().min(1),
   priority:    z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+  type:        z.string().trim().max(100).optional(),
+  subType:     z.string().trim().max(100).optional(),
+  screenshot:  z.string().url().optional(),
 });
 
-// Update — FR-4 (no assignedTo — that's assignSchema)
+// Update — FR-4 (no assignedTo — that's assignSchema); nullable allows clearing fields
 export const updateTicketSchema = z.object({
   title:       z.string().trim().min(1).max(500).optional(),
   description: z.string().trim().min(1).optional(),
   priority:    z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  type:        z.string().trim().max(100).nullable().optional(),
+  subType:     z.string().trim().max(100).nullable().optional(),
+  screenshot:  z.string().url().nullable().optional(),
 }).refine(d => Object.keys(d).length > 0, { message: 'At least one field required' });
 
 // Status transition — FR-5, SM-1
@@ -67,11 +79,12 @@ export const assignSchema = z.object({
   assignedTo: z.string().uuid({ message: 'assignedTo must be a valid UUID' }),
 });
 
-// List query — SF-1–SF-4; z.coerce.number() required for page/limit (query strings are always string)
+// List query — SF-1–SF-4, DM-12; z.coerce.number() required for page/limit (query strings are always string)
 export const listTicketsQuerySchema = z.object({
   status:     z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED']).optional(),
   priority:   z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   assignedTo: z.string().uuid().optional(),
+  type:       z.string().trim().max(100).optional(),   // filter by ticket type
   search:     z.string().trim().max(200).optional(),
   page:       z.coerce.number().int().min(1).default(1),
   limit:      z.coerce.number().int().min(1).max(100).default(20),
@@ -91,6 +104,9 @@ export interface TicketRow {
   id:          string;
   title:       string;
   description: string;
+  type:        string | null;
+  subType:     string | null;
+  screenshot:  string | null;
   priority:    TicketPriority;
   status:      TicketStatus;
   assignedTo:  string;
@@ -135,7 +151,9 @@ Returns `{ tickets: TicketRow[], total: number, page: number, limit: number }`.
 
 **Column SELECT:**
 ```sql
-SELECT t.id, t.title, t.description, t.priority, t.status,
+SELECT t.id, t.title, t.description,
+       t.type, t.sub_type AS "subType", t.screenshot,
+       t.priority, t.status,
        t.assigned_to AS "assignedTo", t.created_by AS "createdBy",
        t.created_at AS "createdAt", t.updated_at AS "updatedAt"
 FROM tickets t
