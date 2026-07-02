@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { ZodError } from 'zod';
 import config from '../config';
+import { error } from '../utils/response';
 
 interface AppError extends Error {
   statusCode?: number;
@@ -13,6 +15,19 @@ const errorHandler = (
   res: Response,
   _next: NextFunction,
 ): void => {
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'File exceeds the maximum allowed size'
+        : err.code === 'LIMIT_FILE_COUNT'
+          ? 'Too many files in a single request'
+          : err.code === 'LIMIT_UNEXPECTED_FILE'
+            ? 'Unexpected file field name'
+            : err.message;
+    error(res, message, 400, 'VALIDATION_ERROR');
+    return;
+  }
+
   if (err instanceof ZodError) {
     const message = err.issues
       .map(
@@ -20,7 +35,7 @@ const errorHandler = (
           `${e.path.join('.') || 'body'}: ${e.message}`,
       )
       .join('; ');
-    res.status(400).json({ success: false, message });
+    error(res, message, 400, 'VALIDATION_ERROR');
     return;
   }
 
