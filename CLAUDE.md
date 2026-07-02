@@ -96,4 +96,4 @@ Sub-agents live in `.claude/agents/*.md` (auto-discovered — never registered i
 
 ## Plans
 `.claude/plans/backend-tooling.md` · `.claude/plans/backend-database.md` · `.claude/plans/backend-schema.md`
-`.claude/plans/schema-alignment.md` · `.claude/plans/auth-validation-upload.md` · `.claude/plans/phase-0-gaps.md` · `.claude/plans/phase-1-schema-alignment.md` · `.claude/plans/tickets-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md` · `.claude/plans/testing-strategy.md`
+`.claude/plans/schema-alignment.md` · `.claude/plans/auth-validation-upload.md` · `.claude/plans/phase-0-gaps.md` · `.claude/plans/phase-1-schema-alignment.md` · `.claude/plans/tickets-module.md` · `.claude/plans/comments-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md` · `.claude/plans/testing-strategy.md`

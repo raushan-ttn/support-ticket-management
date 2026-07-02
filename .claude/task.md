@@ -91,19 +91,21 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Phase 5 — Comments Module
 
-- [ ] `src/modules/comments/comment.schemas.ts`
-  - [ ] `createCommentSchema` (message non-empty, screenshot? URL) — FR-8, VAL-2, DM-13
-  - [ ] `CommentRow` response interface — include `screenshot: string | null`
-- [ ] `src/modules/comments/comment.service.ts`
-  - [ ] `addComment()` — verify ticket exists (404); verify caller scope (403); insert; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, CACHE-5, FR-11
-  - [ ] `listComments()` — admin sees all; agent scoped; ordered by `created_at ASC` — FR-9, FR-6, RBAC-3/4
-  - [ ] Cache: `getCache/setCache` for `ticket:{id}:comments`; invalidate on new comment — CACHE-2, CACHE-5
-  - [ ] Auto-close scheduling: after assignee comment on non-terminal ticket, enqueue/replace delayed `auto-close:{ticketId}` job — FR-12f
-  - [ ] Creator reply: remove pending `auto-close:{ticketId}` job — FR-12a
-- [ ] `src/modules/comments/comment.controller.ts` — `add`, `list`
-- [ ] `src/modules/comments/comment.routes.ts` — mounted under `tickets.routes.ts`
-  - [ ] `GET /:id/comments` (`authenticate`, `list`)
-  - [ ] `POST /:id/comments` (`authenticate`, `validateBody`, `add`)
+- [x] `src/modules/comments/comment.schemas.ts`
+  - [x] `createCommentSchema` (message non-empty via text field; screenshot is a multer file, not a Zod field) — FR-8, VAL-2, DM-13a
+  - [x] `CommentRow` response interface — include `id`, `ticketId`, `message`, `screenshot: string | null`, `createdBy`, `createdAt`
+- [x] `src/modules/comments/comment.service.ts`
+  - [x] `addComment()` — verify ticket exists (404); verify caller scope (403); store screenshot file via storage backend if provided (FR-8b); insert row; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, FR-8b, CACHE-5, FR-11
+  - [x] `listComments()` — admin sees all; agent scoped; ordered by `created_at ASC`; include `screenshot` in SELECT — FR-9, FR-6, RBAC-3/4
+  - [x] `getCommentById()` — return single comment with `screenshot`; 404 if not found or wrong ticket — FR-9a
+  - [x] Cache: `getCache/setCache` for `ticket:{id}:comments`; invalidate on new comment — CACHE-2, CACHE-5
+  - [x] Auto-close scheduling: after assignee comment on non-terminal ticket, enqueue/replace delayed `auto-close:{ticketId}` job — FR-12f
+  - [x] Creator reply: remove pending `auto-close:{ticketId}` job — FR-12a
+- [x] `src/modules/comments/comment.controller.ts` — `add`, `list`, `getById`
+- [x] `src/modules/comments/comment.routes.ts` — mounted under `tickets.routes.ts`
+  - [x] `GET /:id/comments` (`authenticate`, `list`)
+  - [x] `GET /:id/comments/:commentId` (`authenticate`, `getById`) — FR-9a
+  - [x] `POST /:id/comments` (`authenticate`, `upload.single('screenshot')`, validate message text, `add`) — multipart/form-data; screenshot is optional jpg/png file — FR-8, FR-8b
 
 ---
 
@@ -136,7 +138,7 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 7 — Notifications (Email + BullMQ)
 
 - [ ] **Packages:** `bullmq`, `nodemailer`, `@types/nodemailer` — TS-7, TS-8
-- [ ] `src/jobs/queues.ts` — define `emailQueue` and `autoCloseQueue` using `src/config/queue.ts` connection — TS-8
+- [x] `src/jobs/queues.ts` — define `emailQueue` and `autoCloseQueue` using `src/config/queue.ts` connection — TS-8
 - [ ] `src/jobs/mailer.ts` — Nodemailer transport factory (SMTP for prod, JSON/in-memory for `test`, Mailhog for dev) — TS-7, TEST-7
 - [ ] `src/jobs/emailWorker.ts` — BullMQ Worker consuming `email` queue
   - [ ] `new-ticket` job type: email creator + admin; de-duplicate recipients — FR-10

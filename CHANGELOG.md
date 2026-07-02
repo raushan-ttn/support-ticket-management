@@ -92,3 +92,39 @@ None
 None
 
 ---
+
+## 2026-07-01 — Comments Module (Phase 5)
+
+**Branch:** master
+**Requirements:** FR-8, FR-8a, FR-8b, FR-9, FR-9a, FR-11, FR-11a, FR-11b, FR-12, FR-12a, FR-12b, FR-12c, FR-12d, FR-12e, FR-12f, DM-6, DM-7, DM-13, DM-13a, VAL-1, VAL-2, RBAC-3, RBAC-4, RBAC-6, CACHE-2, CACHE-5, CACHE-7, SM-6, SM-7, TEST-7, TEST-8
+
+### What was built
+Implemented three comment endpoints enabling users to add comments with optional screenshot uploads (jpg/png only, stored via configured storage backend), list ticket comments ordered by creation time, and retrieve individual comments. Screenshot upload accepts binary files via multipart/form-data and stores the file via the storage backend (local or S3) without passing client-supplied URLs. Comments trigger two async side effects: email notifications to all ticket participants (via BullMQ emailQueue, deduplicating if creator/assignee/admin are the same person), and delayed auto-close job scheduling (FR-12) with job ID keying ensuring only one pending close per ticket; assignee comments schedule a delayed job while creator replies cancel it. RBAC scoping mirrors tickets: ADMIN sees all comments, AGENT sees comments only on assigned or created tickets (enforced in SQL via `getTicketById`). Comment lists are Redis-cached. Includes full unit and integration test coverage including file upload validation (MIME type, size limits) and role-based access control.
+
+### Files added / modified
+- `src/modules/comments/comment.schemas.ts` — Zod schema for message text only; CommentRow response interface with screenshot storage key
+- `src/modules/comments/comment.service.ts` — Business logic: addComment (with file upload to storage backend), listComments (Redis-cached), getCommentById; fire-and-forget queue enqueue for email and auto-close jobs
+- `src/modules/comments/comment.controller.ts` — HTTP handlers: add (file upload handling), list, getById
+- `src/modules/comments/comment.routes.ts` — Three routes under `/api/v1/tickets/:ticketId/comments` with multer single-file upload middleware and validateBody for message
+- `src/middlewares/upload.ts` — Multer configuration (memoryStorage, mime type allowlist jpg/jpeg/png, per-file size limit)
+- `src/types/jobs.ts` — TypeScript interfaces: CommentNotificationJobData, AutoCloseJobData, NewTicketJobData for BullMQ payloads
+- `src/config/queue.ts` — BullMQ ConnectionOptions singleton for dedicated ioredis connection (separate from cache redis)
+- `src/jobs/queues.ts` — Exported emailQueue and autoCloseQueue BullMQ Queue instances with default job options
+- `src/modules/comments/comment.service.test.ts` — Unit tests with mocked postgres, redis, storage, and queue
+- `src/modules/comments/comment.controller.test.ts` — Integration tests with supertest, real test database, and file upload assertions
+
+### New API endpoints
+- `POST /api/v1/tickets/:ticketId/comments` — Add comment with optional screenshot file (multipart/form-data; jpg/png only); triggers email notification and auto-close job scheduling
+- `GET /api/v1/tickets/:ticketId/comments` — List ticket comments ordered by createdAt ASC; RBAC-scoped; Redis-cached
+- `GET /api/v1/tickets/:ticketId/comments/:commentId` — Fetch single comment by ID; RBAC-scoped via parent ticket validation
+
+### New environment variables
+- `STORAGE_BACKEND` — Storage backend for file uploads: `local` or `s3` (default: `local`)
+- `STORAGE_LOCAL_DIR` — Local filesystem directory for uploads (default: `.uploads`)
+- `AUTO_CLOSE_DELAY_MS` — Delay before auto-close job executes (default: `86400000`, 24 hours)
+- `QUEUE_AUTO_CLOSE_DELAY_MS` — Alternative env var name for auto-close delay (read from config.queue.autoCloseDelayMs)
+
+### Breaking changes
+None
+
+---

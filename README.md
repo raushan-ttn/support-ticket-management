@@ -16,8 +16,8 @@ npm run dev
 
 - User authentication and role-based access control (ADMIN, AGENT)
 - Ticket lifecycle management: creation, listing, retrieval, updates, assignment, and state machine status transitions
-- Comment threads with notifications
-- File attachments with storage backend abstraction
+- Comment threads per ticket, each with optional screenshot URL and user attribution (`createdByName`)
+- File attachments (jpg/jpeg/png only) — multiple files per ticket or per comment, with uploader attribution (`uploadedByName`); local filesystem (dev) or S3 (prod) storage backend
 - JWT-based session management with Passport
 - Redis caching for read-heavy operations
 - Email notifications via BullMQ job queue
@@ -54,8 +54,9 @@ npm run dev
 | `PATCH` | `/api/v1/tickets/:id` | Update ticket title, description, or priority |
 | `PATCH` | `/api/v1/tickets/:id/status` | Transition ticket status through valid state machine paths |
 | `POST` | `/api/v1/tickets/:id/assign` | Assign ticket to user (ADMIN only) |
-| `POST` | `/api/v1/tickets/:id/comments` | Add comment to ticket |
-| `GET` | `/api/v1/tickets/:id/comments` | List ticket comments |
+| `POST` | `/api/v1/tickets/:ticketId/comments` | Add comment to ticket with optional screenshot file (jpg/png, multipart/form-data) |
+| `GET` | `/api/v1/tickets/:ticketId/comments` | List ticket comments ordered by creation time; RBAC-scoped; Redis-cached |
+| `GET` | `/api/v1/tickets/:ticketId/comments/:commentId` | Fetch single comment by ID; RBAC-scoped |
 | `POST` | `/api/v1/tickets/:id/attachments` | Upload file attachment |
 | `GET` | `/api/v1/tickets/:id/attachments` | List ticket attachments |
 | `GET` | `/api/v1/attachments/:id/download` | Download attachment |

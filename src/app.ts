@@ -10,6 +10,7 @@ import config from './config';
 import passport from './config/passport';
 import errorHandler from './middlewares/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
+import commentsRouter from './modules/comments/comment.routes';
 import ticketRoutes from './modules/tickets/ticket.routes';
 import { success } from './utils/response';
 
@@ -38,6 +39,7 @@ const authLimiter = rateLimit({
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/tickets', ticketRoutes);
+app.use('/api/v1/tickets', commentsRouter);
 
 app.use(errorHandler);
 

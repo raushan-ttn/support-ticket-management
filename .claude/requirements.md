@@ -87,12 +87,13 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 | id         | UUID / serial | PK |
 | ticketId   | FK → Ticket.id | NOT NULL |
 | message    | text | NOT NULL, non-empty after trim |
-| screenshot | string (URL) | NULLABLE — URL of a screenshot attached to this comment (see DM-13) |
+| screenshot | string (storage path / URL) | NULLABLE — path/URL of an uploaded screenshot file for this comment (see DM-13a) |
 | createdBy  | FK → User.id | NOT NULL |
 | createdAt  | timestamptz | NOT NULL, set on insert |
 
 - **DM-6:** Deleting a ticket (if ever supported) cascades to its comments. Deletion is out of scope for Core.
 - **DM-7:** Index `ticketId` to support comment retrieval per ticket.
+- **DM-13a:** `screenshot` on **comments** is the result of a file upload (jpg/png only). The backend stores the file via the storage backend (TS-9), saves the resulting path/URL in `comments.screenshot`, and includes it in list/detail responses. This is distinct from `tickets.screenshot` (DM-13) which remains a plain client-provided URL string.
 
 ### 3.4 `Attachment`
 | Field      | Type | Constraints |
@@ -177,9 +178,11 @@ requirement; the API must be able to establish who is calling and with what role
 ### 5.3 Comment Requirements
 | ID    | Requirement |
 |-------|-------------|
-| **FR-8** | **Add comment.** `POST /api/tickets/:id/comments` persists a comment with `ticketId`, `message`, `createdBy` (the caller), `createdAt`. `message` required and non-empty. |
+| **FR-8** | **Add comment.** `POST /api/tickets/:id/comments` accepts `multipart/form-data` with `message` (required, non-empty text) and an optional `screenshot` file (jpg/png only). Persists the comment with `ticketId`, `message`, `createdBy` (the caller), `createdAt`, and `screenshot` (storage path/URL after upload, or null). |
 | FR-8a | Adding a comment to a non-existent ticket → `404`. |
-| **FR-9** | **List comments.** `GET /api/tickets/:id/comments` returns the ticket's comments ordered by `createdAt` ascending. |
+| FR-8b | If a screenshot file is provided, validate MIME type (`image/jpeg`, `image/png` only) and file size against configured limits; reject with `415` for disallowed MIME types. Store via the storage backend (TS-9); save the resulting path/URL in `comments.screenshot`. Never store raw bytes in Postgres. |
+| **FR-9** | **List comments.** `GET /api/tickets/:id/comments` returns the ticket's comments ordered by `createdAt` ascending. Each comment object includes the `screenshot` field (path/URL string or null). |
+| FR-9a | **Get comment by ID.** `GET /api/tickets/:id/comments/:commentId` returns a single comment including the `screenshot` field. Returns `404` if the comment does not exist or does not belong to the ticket. |
 
 ### 5.4 Notification Requirements (Email)
 
