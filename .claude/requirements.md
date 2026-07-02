@@ -40,7 +40,7 @@ incoming tickets and assigns them to the agent responsible for the work.
 | TS-6  | The service must start successfully and serve health checks even if Redis is unavailable (graceful cache degradation — see CACHE-7). It must **not** start if Postgres is unreachable. |
 | TS-7  | **Email transport (SMTP).** Outbound notifications are sent via a configurable SMTP transport (env-driven). Dev/test may use a capture transport (e.g. Mailhog, or an in-memory/console transport) — no real mail in tests. |
 | TS-8  | **Redis-backed job queue (e.g. BullMQ).** Asynchronous email delivery (§5.4) and the delayed auto-close job (§5.5) run on a Redis-backed queue, reusing the Redis instance from TS-2. |
-| TS-9  | **File storage backend.** Attachment binaries are stored in an object/file store — local filesystem for dev, S3-compatible object storage for prod — selected via env config. **Binaries are never stored in Postgres** (Postgres holds metadata only) and **never cached in Redis** (CACHE-9). Multipart upload handling is required. |
+| TS-9  | **File storage backend.** Attachment binaries are stored in an object/file store — local filesystem (`public/uploads/` directory, served as static files via `express.static`) for dev, S3-compatible object storage for prod — selected via `STORAGE_BACKEND` env config. The storage backend returns a public-accessible URL (`url`) for each saved file; no separate download endpoint is required. **Binaries are never stored in Postgres** (Postgres holds metadata only) and **never cached in Redis** (CACHE-9). Multipart upload handling is required. |
 
 ---
 
@@ -108,7 +108,7 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 | uploadedBy | FK → User.id | NOT NULL |
 | createdAt  | timestamptz | NOT NULL, set on insert |
 
-- **DM-8:** Postgres stores attachment **metadata only**; bytes live in the storage backend (TS-9).
+- **DM-8:** Postgres stores attachment **metadata only**; bytes live in the storage backend (TS-9). Responses include a derived `url` field (static path for local dev, S3 object URL for prod) — `storageKey` is internal and never returned to clients.
 - **DM-9:** `ticketId` drives authorization — access to an attachment is exactly access to its parent ticket (RBAC-3/4).
 - **DM-10:** `commentId`, when set, must belong to the same `ticketId` (cross-ticket references rejected).
 - **DM-11:** Index `ticketId` (and `commentId`) to support listing attachments per ticket/comment.
@@ -141,19 +141,18 @@ requirement; the API must be able to establish who is calling and with what role
 ### 5.1 Endpoint Summary
 | Method | Path | Purpose | Auth |
 |--------|------|---------|------|
-| POST   | `/api/tickets` | Create ticket (auto-assigned to admin, `OPEN`) | Any role |
+| POST   | `/api/tickets` | Create ticket (auto-assigned to admin, `OPEN`); accepts optional PNG/JPG files | Any role |
 | GET    | `/api/tickets` | List/search/filter tickets | Any role (scope by RBAC-3/4) |
-| GET    | `/api/tickets/:id` | Ticket detail | Any role (scoped) |
-| PATCH  | `/api/tickets/:id` | Update title/description/priority/assignee | Per RBAC |
+| GET    | `/api/tickets/:id` | Ticket detail including inline `attachments` array | Any role (scoped) |
+| PATCH  | `/api/tickets/:id` | Update title/description/priority/assignee; accepts optional PNG/JPG files | Per RBAC |
 | PATCH  | `/api/tickets/:id/status` | Status transition (state machine) | Per RBAC |
 | POST   | `/api/tickets/:id/assign` | Assign/reassign ticket | **Admin only** |
-| GET    | `/api/tickets/:id/comments` | List comments for a ticket | Any role (scoped) |
-| POST   | `/api/tickets/:id/comments` | Add a comment | Any role (scoped) |
-| POST   | `/api/tickets/:id/attachments` | Upload attachment(s) to a ticket | Any role (scoped) |
-| GET    | `/api/tickets/:id/attachments` | List attachment metadata for a ticket | Any role (scoped) |
-| GET    | `/api/attachments/:attachmentId` | Download an attachment (streamed) | Any role (scoped to parent ticket) |
-| DELETE | `/api/attachments/:attachmentId` | Delete an attachment | Uploader or admin |
+| GET    | `/api/tickets/:id/comments` | List comments for a ticket; each comment includes inline `attachments` array | Any role (scoped) |
+| POST   | `/api/tickets/:id/comments` | Add a comment; accepts optional PNG/JPG files | Any role (scoped) |
+| GET    | `/api/tickets/:id/comments/:commentId` | Single comment with inline `attachments` array | Any role (scoped) |
 
+> There are **no standalone attachment endpoints**. File upload is part of ticket/comment mutation endpoints; attachment metadata (with direct-access `url`) is embedded in ticket/comment responses.
+>
 > Update of assignee may be supported either via `PATCH /api/tickets/:id` (assignee
 > field) or the dedicated `POST /api/tickets/:id/assign`. If both exist, both go
 > through the same admin-only assignment service path.
@@ -217,18 +216,18 @@ who fills more than one role (e.g. creator who is also admin) receives a single 
 
 Files are stored in the storage backend (TS-9); Postgres holds only metadata (§3.4).
 Authorization on every attachment operation is exactly authorization on its **parent
-ticket** (RBAC-3/4, DM-9).
+ticket** (RBAC-3/4, DM-9). There are **no standalone attachment endpoints** — upload is
+integrated into ticket/comment mutation endpoints and metadata is embedded in their responses.
 
 | ID    | Requirement |
 |-------|-------------|
-| **FR-13** | **Upload.** `POST /api/tickets/:id/attachments` accepts one or more files via `multipart/form-data`, persists each to the storage backend, and records metadata (§3.4). Optionally accepts a `commentId` to attach to a specific comment of the same ticket (DM-10). |
+| **FR-13** | **Upload.** One or more files (up to the configured per-request limit) are accepted as optional `multipart/form-data` on: `POST /api/tickets` (ticket-level attachments), `PATCH /api/tickets/:id` (additional ticket-level attachments), and `POST /api/tickets/:id/comments` (comment-level attachments linked to the new comment via `commentId`). A ticket or comment may accumulate multiple attachments across calls. Each file is persisted to the storage backend and a metadata row is recorded (§3.4). |
 | FR-13a | The uploader must have access to the parent ticket; otherwise `403`. Upload to a non-existent ticket → `404`. |
-| FR-13b | **Validation (VAL-6):** reject files whose MIME type is outside the configured allowlist (`415`/`400`), exceed the configured per-file size limit, or exceed the per-request file count limit. Validate **before** persisting bytes. |
-| FR-13c | Original filenames are **sanitized**; storage keys are server-generated (e.g. uuid-based) so a client cannot influence the storage path (no path traversal). |
-| **FR-14** | **List.** `GET /api/tickets/:id/attachments` returns attachment **metadata** (id, filename, mimeType, sizeBytes, uploadedBy, createdAt, commentId), scoped to the ticket. It does not return bytes. |
-| **FR-15** | **Download.** `GET /api/attachments/:attachmentId` **streams** the file from storage with correct `Content-Type` and `Content-Disposition`. Caller must have access to the parent ticket (else `403`); unknown id → `404`. Bytes are streamed, not buffered fully in memory (NFR-12). |
-| **FR-16** | **Delete.** `DELETE /api/attachments/:attachmentId` removes the metadata row and the stored object. Allowed only for the **uploader or an admin** (else `403`). Deletion of metadata and storage object should be consistent — orphaned objects are cleaned up / tolerated, never an orphaned metadata row pointing at missing bytes presented as valid. |
-| FR-17 | Attachments are **not** cached in Redis (CACHE-9); metadata listings may be cached and invalidated on upload/delete. |
+| FR-13b | **Validation (VAL-6):** only `image/jpeg` and `image/png` MIME types are accepted — all other types are rejected with `415`. Files exceeding the configured per-file size limit or per-request file count limit are rejected with `400`. Validate **before** persisting bytes. |
+| FR-13c | Original filenames are **sanitized** (`sanitize-filename`); storage keys are server-generated (UUID-based) so a client cannot influence the storage path. The storage backend returns a public-accessible `url` for each saved file — a static path (`/uploads/…`) for local dev, an S3 object URL for prod. |
+| **FR-14** | **Access via responses.** A ticket or comment may have **multiple attachments**. Attachment metadata — `{ id, filename, mimeType, sizeBytes, uploadedBy, createdAt, commentId, url }` — is returned as an array (`attachments: AttachmentRow[]`) inline in: `GET /api/tickets/:id` (all attachments for the ticket), `GET /api/tickets/:id/comments` (per-comment `attachments` array), and `GET /api/tickets/:id/comments/:commentId`. The `url` provides direct file access; `storageKey` is never exposed. |
+| FR-15 | **No separate download endpoint.** Files are accessed directly via the `url` field in responses. Local dev serves files from `public/uploads/` as static assets via `express.static`; S3 prod serves files via S3 object URL. |
+| FR-16 | **Metadata cache.** Attachment metadata for a ticket is cached as `ticket:{id}:attachments` and invalidated on every new upload (CACHE-9). Attachment bytes are never cached in Redis. |
 
 ---
 
@@ -285,7 +284,7 @@ IN_PROGRESS  -> CANCELLED
 | VAL-3 | `priority` and `status` inputs must be members of their enums. |
 | VAL-4 | Referenced users (`assignedTo`) and tickets (`:id`, `ticketId`) must exist; otherwise `400` (bad reference) or `404` (missing resource) as appropriate. |
 | VAL-5 | Unknown/unexpected body fields are ignored or rejected consistently (decide one policy and apply uniformly). |
-| VAL-6 | **Attachment validation:** MIME type must be in the configured allowlist; per-file size and per-request file-count limits enforced; filenames sanitized; storage keys server-generated (FR-13b/c). Limits are env-configured (see Assumptions). |
+| VAL-6 | **Attachment validation:** MIME type must be `image/jpeg` or `image/png` — all other types rejected with `415`; per-file size and per-request file-count limits enforced (400 on breach); filenames sanitized; storage keys server-generated (FR-13b/c). Size/count limits are env-configured (see Assumptions). |
 
 ### 8.2 Error Taxonomy
 | ID    | Requirement |
@@ -374,13 +373,10 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
 - **Auto-close extends the signature state machine** with a system-only `-> CLOSED`
   transition (SM-6); confirm this is acceptable versus auto-`RESOLVED`→`CLOSED` or an
   `AUTO_CLOSED` status.
-- **Attachment storage backend** is config-driven: local filesystem for dev, S3-compatible
-  for prod. Confirm the prod target (e.g. AWS S3, MinIO).
-- **Attachment limits** (allowed MIME types, max file size, max files per request) are
-  env-configured. Suggested defaults to confirm: images + PDF + common office docs,
-  10 MB/file, 5 files/request.
-- **Attachments attach at ticket level and optionally at comment level**; both share one
-  `Attachment` table scoped by `ticketId`. Confirm if comment-level attachments are needed.
+- **Attachment storage backend** is config-driven: local filesystem (`public/uploads/`, static-served) for dev, S3-compatible for prod. Confirm the prod target (e.g. AWS S3, MinIO).
+- **Attachment MIME allowlist** is fixed to `image/jpeg` and `image/png` — no PDFs or office documents.
+- **Attachment limits** (max file size, max files per request) are env-configured. Suggested defaults: 5 MB/file, 5 files/request.
+- **Attachments attach at ticket level and optionally at comment level**; both share one `Attachment` table scoped by `ticketId`. No standalone attachment upload/download/delete endpoints.
 - **Virus/malware scanning** of uploads is out of scope (candidate for stretch).
 
 ---
@@ -404,7 +400,7 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
 - [ ] Notification failures are retried/logged and never fail the originating API call.
 - [ ] An assignee comment with no creator reply within 48h auto-closes the ticket via the system transition; a creator reply within the window prevents it.
 - [ ] Auto-close re-validates ticket state at execution time and notifies involved parties.
-- [ ] Files can be uploaded to a ticket (and optionally a comment); metadata in Postgres, bytes in the storage backend.
-- [ ] Upload rejects disallowed MIME types, oversize files, and over-count requests.
-- [ ] Attachments can be listed (metadata) and downloaded (streamed), scoped to parent-ticket access.
-- [ ] Attachment delete is restricted to the uploader or an admin; no secrets or binaries cached in Redis.
+- [ ] PNG/JPG files can be uploaded to a ticket or comment via ticket/comment mutation endpoints; metadata in Postgres, bytes in storage backend.
+- [ ] Upload rejects non-PNG/JPG MIME types (`415`), oversize files, and over-count requests (`400`).
+- [ ] Attachment metadata (including direct-access `url`) is returned inline in ticket detail and comment list/detail responses.
+- [ ] No standalone attachment endpoints exist; no attachment bytes cached in Redis.

@@ -109,29 +109,26 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ---
 
-## Phase 6 — Storage Abstraction & Attachments Module
+## Phase 6 — Storage Abstraction & Attachments
 
 - [x] **Packages:** `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `sanitize-filename`, `mime-types`, `@types/sanitize-filename`, `@types/mime-types` — TS-9, FR-13c
-- [x] `src/storage/index.ts` — `IStorageBackend` interface (`save`, `getStream`, `delete`); factory selects backend from `STORAGE_BACKEND` env — NFR-13
-- [x] `src/storage/local.ts` — local filesystem implementation (dev/test); saves to `public/YYYY-MM-DD/{uuid}` — TS-9
-- [x] `src/storage/s3.ts` — S3-compatible implementation (prod) — TS-9
+- [x] `src/storage/index.ts` — `IStorageBackend` interface (`save`, `delete`); `save` returns `{ storageKey, url }`; factory selects backend from `STORAGE_BACKEND` env — NFR-13
+- [x] `src/storage/local.ts` — saves to `public/uploads/YYYY-MM-DD/{uuid}{ext}`; returns static-served path `/uploads/YYYY-MM-DD/{uuid}{ext}` as `url` — TS-9
+- [x] `src/storage/s3.ts` — S3-compatible implementation (prod); returns S3 object URL as `url` — TS-9
+- [ ] Mount `public/` as static in `src/app.ts` via `express.static('public')` for local dev file serving — TS-9
 - [ ] `src/modules/attachments/attachment.schemas.ts`
-  - [ ] `uploadAttachmentSchema` (optional `commentId`) — FR-13
-  - [ ] `AttachmentRow` response interface (no `storage_key` — internal only) — §3.4, FR-14
+  - [ ] `AttachmentRow` response interface: `{ id, filename, mimeType, sizeBytes, uploadedBy, createdAt, commentId, url }` — no `storageKey` in response — §3.4, FR-14
 - [ ] `src/modules/attachments/attachment.service.ts`
-  - [ ] `uploadAttachments()` — verify ticket (404) + scope (403); validate MIME/size/count (VAL-6, 415/400); sanitize filename (FR-13c); server-generated storage key (UUID); persist metadata + bytes — FR-13, FR-13a/b/c
-  - [ ] Validate `commentId` belongs to same `ticketId` — DM-10
-  - [ ] `listAttachments()` — metadata only, scoped to ticket — FR-14, RBAC-3/4
-  - [ ] `downloadAttachment()` — verify ticket scope (403); 404 if not found; stream from storage — FR-15, NFR-12
-  - [ ] `deleteAttachment()` — uploader or admin only (403); delete metadata row + storage object — FR-16
-  - [ ] Cache: `ticket:{id}:attachments` for metadata listing; invalidate on upload/delete — CACHE-9, FR-17
-- [ ] `src/modules/attachments/attachment.controller.ts` — `upload`, `list`, `download`, `delete`
-- [ ] `src/modules/attachments/attachment.routes.ts`
-  - [ ] `POST /api/v1/tickets/:id/attachments` (`authenticate`, multer, `upload`)
-  - [ ] `GET /api/v1/tickets/:id/attachments` (`authenticate`, `list`)
-  - [ ] `GET /api/v1/attachments/:attachmentId` (`authenticate`, `download`)
-  - [ ] `DELETE /api/v1/attachments/:attachmentId` (`authenticate`, `delete`)
-- [ ] Mount attachments router in `src/app.ts`
+  - [ ] `uploadAttachments(ticketId, files, uploadedBy, commentId?)` — accepts array of files (multiple per call); verify ticket (404) + scope (403); validate each file: MIME (`image/jpeg`/`image/png` only → 415), size + total count (VAL-6 → 400); sanitize filename; UUID storage key per file; save via storage backend; persist one metadata row per file; return `AttachmentRow[]` with `url` — FR-13, FR-13a/b/c
+  - [ ] Validate `commentId` belongs to same `ticketId` when provided — DM-10
+  - [ ] `getAttachmentsByTicket(ticketId)` — returns all `AttachmentRow[]` for the ticket (multiple rows possible); cache as `ticket:{id}:attachments`; invalidate on new upload — CACHE-9, FR-14
+  - [ ] `getAttachmentsByComment(commentId)` — returns all `AttachmentRow[]` for a single comment (multiple rows possible) — FR-14
+- [ ] Extend `ticket.service.getTicketById()` to include inline `attachments: AttachmentRow[]` in response — FR-14
+- [ ] Extend `comment.service.listComments()` and `getCommentById()` to include inline `attachments: AttachmentRow[]` per comment — FR-14
+- [ ] Extend `POST /api/v1/tickets` to accept optional PNG/JPG files via `upload.array('files', maxCount)` multer; call `uploadAttachments()` after ticket insert — FR-13
+- [ ] Extend `PATCH /api/v1/tickets/:id` to accept optional PNG/JPG files via `upload.array('files', maxCount)` multer; call `uploadAttachments()` on new files — FR-13
+- [ ] Extend `POST /api/v1/tickets/:id/comments` to accept optional PNG/JPG files via `upload.array('files', maxCount)` multer alongside existing `screenshot` field; call `uploadAttachments()` with `commentId` — FR-13
+- [ ] **No separate attachment endpoints** — no `/api/v1/attachments/*` routes; upload is part of ticket/comment mutation endpoints; access is through ticket/comment response bodies only
 
 ---
 
@@ -185,12 +182,12 @@ Traceable to `requirements.md`. Check off items as they are completed.
   - [ ] (d) Last-moment creator reply → execution-time re-validation → ticket unchanged — FR-12c
   - [ ] Uses injectable `AUTO_CLOSE_DELAY_MS=0` for test speed
 - [ ] **Attachments (TEST-9)**
-  - [ ] Allowed MIME + within size → `201`; `storageKey` absent from response — FR-13
-  - [ ] Disallowed MIME → `415`; oversize → `400`; over file count → `400` — VAL-6
-  - [ ] Download → `200` with correct `Content-Type` + `Content-Disposition: attachment` — FR-15
-  - [ ] Caller without parent-ticket access → `403` on list/download — RBAC-3/4
-  - [ ] Delete by non-uploader non-admin → `403`; by uploader → `204` — FR-16
-  - [ ] Uses `STORAGE_BACKEND=local` + `.tmp/test-uploads`; cleaned up in `afterAll`
+  - [ ] Allowed PNG/JPG within size limit → attachment metadata row created; `storageKey` absent from response; `url` present — FR-13
+  - [ ] Disallowed MIME (e.g. PDF, GIF) → `415`; oversize → `400`; over file count → `400` — VAL-6, FR-13b
+  - [ ] Ticket detail (`GET /api/v1/tickets/:id`) includes inline `attachments` array with correct metadata + `url` — FR-14
+  - [ ] Comment list/detail includes inline `attachments` array per comment — FR-14
+  - [ ] Caller without parent-ticket access → `403` on ticket/comment endpoints — RBAC-3/4
+  - [ ] Uses `STORAGE_BACKEND=local` + `public/uploads` test directory; files cleaned up in `afterAll`
 
 ---
 
@@ -214,7 +211,7 @@ Traceable to `requirements.md`. Check off items as they are completed.
 - [ ] Assignee comment with no creator reply within 48h auto-closes the ticket
 - [ ] Creator reply within window prevents auto-close; re-validated at execution time
 - [ ] Auto-close notifies involved parties
-- [ ] Files uploadable to a ticket (and optionally a comment); metadata in Postgres, bytes in storage
-- [ ] Upload rejects disallowed MIME, oversize, over-count
-- [ ] Attachments listable (metadata) and downloadable (streamed), scoped to ticket access
-- [ ] Attachment delete restricted to uploader or admin; no bytes cached in Redis
+- [ ] PNG/JPG files uploadable to a ticket or comment via ticket/comment mutation endpoints; metadata in Postgres, bytes in storage backend
+- [ ] Upload rejects non-PNG/JPG MIME types, oversize files, and over-count requests
+- [ ] Attachment metadata (including direct-access `url`) returned inline in ticket detail and comment list/detail responses
+- [ ] No separate attachment endpoints; no bytes cached in Redis
