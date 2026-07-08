@@ -16,11 +16,3 @@ export interface CommentNotificationJobData {
   attachmentCount?: number;
   attachmentFilenames?: string[];
 }
-
-export interface AutoCloseJobData {
-  ticketId: string;
-  triggeringCommentId: string;
-  assigneeId: string;
-  creatorId: string;
-  adminId: string;
-}

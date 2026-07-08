@@ -3,7 +3,17 @@
 > **Status:** Implemented
 > **Branch:** master
 > **Date:** 2026-07-01
-> **Requirements:** FR-8, FR-8a, FR-8b, FR-9, FR-9a, FR-11, FR-11a, FR-11b, FR-12, FR-12a, FR-12b, FR-12c, FR-12d, FR-12e, FR-12f, RBAC-3, RBAC-4, RBAC-6, CACHE-2, CACHE-5, CACHE-7, CACHE-8, DM-6, DM-7, DM-13a, SM-6, SM-7, TS-7, TS-8, TS-9, VAL-2, NFR-8, NFR-9, NFR-10, NFR-11, TEST-7, TEST-8
+> **Requirements:** FR-8, FR-8a, FR-8b, FR-9, FR-9a, FR-11, FR-11a, FR-11b, RBAC-3, RBAC-4, RBAC-6, CACHE-2, CACHE-5, CACHE-7, CACHE-8, DM-6, DM-7, DM-13a, TS-7, TS-9, VAL-2, NFR-8, NFR-11, TEST-7
+>
+> **Update (2026-07-08):** Auto-close (formerly `FR-12*`, `SM-6`, `SM-7`, `TS-8`,
+> `NFR-9`, `NFR-10`, `TEST-8`) was **removed from scope** — it required a
+> Redis-backed BullMQ delayed-job queue that is not part of this implementation
+> (`requirements.md` §1.2). This document originally described that feature as
+> implemented; the sections below are updated to flag the corresponding code (the
+> `autoCloseQueue` scheduling calls in this module, and `systemCloseTicket()` in the
+> tickets module) as **dead code pending removal** (`task.md` Phase 8). Email
+> notifications remain in scope but are now sent via a **direct, non-queued call**
+> (Phase 7), not the `emailQueue` BullMQ queue described below.
 
 ---
 
@@ -13,7 +23,7 @@ The Comments Module exposes three REST endpoints for adding and retrieving comme
 
 Adding a comment (FR-8) accepts `multipart/form-data` so that an optional screenshot image can be uploaded in the same request. The screenshot is validated against an allowed MIME type set (`image/jpeg`, `image/png`), stored in the configured storage backend (local filesystem or S3), and the resulting storage key is persisted in the `comments.screenshot` column. This is distinct from the `attachments` system — a comment screenshot is a single companion image uploaded at comment-creation time, not a separately tracked attachment record (DM-13a).
 
-After a successful insert, the module fires two independent, fire-and-forget background jobs: a `comment-notification` email job directed at every party involved in the ticket (excluding the comment author), and — depending on the caller's relationship to the ticket — a BullMQ delayed `auto-close` job that will close the ticket if the creator does not reply within the configured window (default 48 h). Both jobs are wrapped in their own `try/catch` blocks so a queue failure never propagates to the API caller (NFR-8, NFR-11). The comment list endpoint is Redis-cached under `ticket:{ticketId}:comments` and invalidated on every new comment (CACHE-2, CACHE-5).
+After a successful insert, the module **currently** fires two independent, fire-and-forget background jobs via BullMQ: a `comment-notification` email job, and — depending on the caller's relationship to the ticket — a delayed `auto-close` job. **This predates the 2026-07-08 decision above.** The `comment-notification` path is slated to be replaced with a direct `sendCommentNotificationEmail()` call (Phase 7), and the `auto-close` scheduling/cancellation calls are slated for outright removal (Phase 8) since the feature is out of scope. Both are currently wrapped in their own `try/catch` blocks so a queue failure never propagates to the API caller. The comment list endpoint is Redis-cached under `ticket:{ticketId}:comments` and invalidated on every new comment (CACHE-2, CACHE-5).
 
 ---
 
@@ -25,10 +35,10 @@ The module lives at `src/modules/comments/` and integrates with shared infrastru
 |------|------|
 | `src/modules/comments/comment.routes.ts` | Route definitions + middleware chain (authenticate, multer, validateBody) |
 | `src/modules/comments/comment.controller.ts` | Parses `req.params`, delegates to service, sends `success()`/`error()` |
-| `src/modules/comments/comment.service.ts` | Business logic: ticket scope gate, screenshot upload, DB insert, cache invalidation, queue enqueue |
+| `src/modules/comments/comment.service.ts` | Business logic: ticket scope gate, screenshot upload, DB insert, cache invalidation, queue enqueue *(queue calls are dead code pending Phase 7/8 cleanup)* |
 | `src/modules/comments/comment.schemas.ts` | Zod schema for request body (`createCommentSchema`), `CommentRow` interface, `CreateCommentPayload` type |
-| `src/types/jobs.ts` | TypeScript interfaces for all job payloads: `NewTicketJobData`, `CommentNotificationJobData`, `AutoCloseJobData` |
-| `src/jobs/queues.ts` | BullMQ `Queue` instances: `emailQueue` and `autoCloseQueue` |
+| `src/types/jobs.ts` | TypeScript interfaces for job payloads: `NewTicketJobData`, `CommentNotificationJobData` (kept); `AutoCloseJobData` (dead code, pending removal) |
+| `src/jobs/queues.ts` | BullMQ `Queue` instances: `emailQueue` and `autoCloseQueue` — **dead code, pending removal** (no job queue is used; see notifications-email.md) |
 | `src/middlewares/upload.ts` | Multer instance (memory storage) with MIME allowlist, per-file size cap, and per-request file count limit |
 | `src/storage/index.ts` | `StorageBackend` interface, `buildStorageKey()` utility, lazy backend factory (`local` or `s3`) |
 
@@ -214,9 +224,12 @@ The `keyPrefix` (`stm:`) is automatically prepended by ioredis — keys stored i
 
 ---
 
-## Auto-Close State Machine Integration
+## Auto-Close State Machine Integration — Removed From Scope (2026-07-08)
 
-The comments module is the only place where the auto-close delayed job (FR-12) is scheduled and cancelled. The job interacts with the ticket state machine via the system-only `SM-6` transition.
+*(This section describes a feature that has been removed from scope — see the note at
+the top of this document. Kept for historical/cleanup reference only.)*
+
+The comments module is the only place where the auto-close delayed job (formerly FR-12) was scheduled and cancelled. The job interacted with the ticket state machine via the system-only `SM-6` transition. Neither is reachable in a meaningful way anymore since no worker ever consumed the `auto-close` queue; the scheduling/cancellation calls below are dead code pending removal (`task.md` Phase 8).
 
 ### Valid transitions triggered by this module
 
@@ -235,12 +248,12 @@ Illegal or unnecessary transitions (e.g. firing on `RESOLVED`, `CLOSED`, `CANCEL
 
 ---
 
-## Background Jobs
+## Background Jobs — Being Replaced (Phase 7) / Removed (Phase 8)
 
-| Queue | Job name | Enqueued by | Payload | Retry / cleanup policy |
-|-------|----------|-------------|---------|------------------------|
-| `email` | `comment-notification` | `comment.service.ts` → `addComment` | `CommentNotificationJobData` | Default BullMQ retry; `removeOnComplete: 100`, `removeOnFail: 200` |
-| `auto-close` | `auto-close` | `comment.service.ts` → `addComment` (assignee comment path) | `AutoCloseJobData` | Delayed by `AUTO_CLOSE_DELAY_MS`; `jobId = auto-close:{ticketId}` ensures one pending job per ticket; `removeOnComplete: true`, `removeOnFail: false` |
+| Queue | Job name | Enqueued by | Payload | Status |
+|-------|----------|-------------|---------|--------|
+| `email` | `comment-notification` | `comment.service.ts` → `addComment` | `CommentNotificationJobData` | To be replaced with a direct `sendCommentNotificationEmail()` call — no queue (Phase 7) |
+| `auto-close` | `auto-close` | `comment.service.ts` → `addComment` (assignee comment path) | `AutoCloseJobData` | **Dead code, pending removal.** Feature removed from scope 2026-07-08 (Phase 8) |
 
 ### CommentNotificationJobData payload fields
 
@@ -258,7 +271,7 @@ Illegal or unnecessary transitions (e.g. firing on `RESOLVED`, `CLOSED`, `CANCEL
 
 The email worker is responsible for de-duplicating recipients and excluding the comment author. If `commentAuthorId` matches `creatorId`, `assigneeId`, or `adminId`, that address is omitted from the send list.
 
-### AutoCloseJobData payload fields
+### AutoCloseJobData payload fields — dead code, pending removal
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -268,7 +281,7 @@ The email worker is responsible for de-duplicating recipients and excluding the 
 | `creatorId` | `string` | UUID of the ticket creator |
 | `adminId` | `string` | UUID of the first seeded ADMIN |
 
-Both job enqueue calls are fire-and-forget: each runs inside its own `try/catch`, logs failures to `stderr`, and never re-throws. The originating HTTP request completes independently of queue availability (NFR-8, NFR-11).
+Both job enqueue calls are fire-and-forget: each runs inside its own `try/catch`, logs failures to `stderr`, and never re-throws. The originating HTTP request completes independently of queue availability (NFR-8, NFR-11). As noted above, the `comment-notification` enqueue is slated to become a direct call and the `auto-close` enqueue is slated for removal.
 
 ---
 
@@ -276,7 +289,7 @@ Both job enqueue calls are fire-and-forget: each runs inside its own `try/catch`
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AUTO_CLOSE_DELAY_MS` | `172800000` (48 h) | Delay before the auto-close job fires; set to `0` in tests |
+| `AUTO_CLOSE_DELAY_MS` | `172800000` (48 h) | **Unused** — auto-close removed from scope 2026-07-08; pending removal from config |
 | `ATTACHMENT_ALLOWED_MIME_TYPES` | `image/jpeg,image/png` | Comma-separated MIME types accepted by the multer upload middleware. For comment screenshots the service additionally enforces only `image/jpeg` and `image/png` regardless of this setting. |
 | `ATTACHMENT_MAX_FILE_SIZE_BYTES` | `10485760` (10 MB) | Maximum size for any single uploaded file |
 | `ATTACHMENT_MAX_FILES_PER_REQUEST` | `5` | Maximum files per multipart request (comment screenshots use `upload.single`, so this cap does not apply) |
@@ -313,16 +326,13 @@ npm run test:coverage -- --testPathPattern="comment"
 
 | Test file | What it covers |
 |-----------|----------------|
-| `src/modules/comments/comment.service.test.ts` | Unit tests: happy path, MIME rejection, ticket scope gate (403/404), cache hit/miss, queue enqueue/cancel logic |
+| `src/modules/comments/comment.service.test.ts` | Unit tests: happy path, MIME rejection, ticket scope gate (403/404), cache hit/miss, direct notification call (post-Phase-7) |
 | `src/modules/comments/comment.controller.test.ts` | Integration: HTTP status codes, response envelope shape, 401 for missing JWT, 403 for out-of-scope agent |
 
 ### Key test scenarios
 
-- **TEST-7 (notification):** With `NODE_ENV=test` (json transport), assert that `comment-notification` job payload contains all three recipient IDs and that `commentAuthorId` is correctly set so the worker can exclude the author. Assert de-duplication when creator is the same user as admin.
-- **TEST-8a (auto-close scheduled):** Assignee posts comment on `OPEN`/`IN_PROGRESS` ticket → `autoCloseQueue.add()` called with `jobId = auto-close:{ticketId}` and delay `AUTO_CLOSE_DELAY_MS`.
-- **TEST-8b (auto-close cancelled):** Creator posts comment after assignee → `autoCloseQueue.getJob()` called and `job.remove()` invoked.
-- **TEST-8c (auto-close fires):** Call worker handler directly with `AUTO_CLOSE_DELAY_MS=0`; assert ticket status transitions to `CLOSED` via system transition (SM-6).
-- **TEST-8d (execution-time re-validation):** Creator replies after assignee but before job executes; handler re-reads ticket and leaves status unchanged (FR-12c).
+- **TEST-7 (notification):** With `NODE_ENV=test` (json transport), assert that `sendCommentNotificationEmail()` is called with all three recipient IDs and that `commentAuthorId` is correctly excluded. Assert de-duplication when creator is the same user as admin. (Direct call, no queue/worker — supersedes the job-payload assertion this doc previously described.)
+- ~~TEST-8a–d (auto-close)~~ — **removed from scope 2026-07-08**, not written.
 - Screenshot rejected with wrong MIME → `415 UNSUPPORTED_MEDIA_TYPE`.
 - Unauthenticated request → `401`.
 - Agent commenting on foreign ticket → `403`.
@@ -337,5 +347,6 @@ npm run test:coverage -- --testPathPattern="comment"
 - **Per-comment cache:** Only the comment list is cached (`ticket:{ticketId}:comments`). Individual comment lookups (`getCommentById`) always hit the database. This is acceptable given comment detail requests are infrequent, but a `comment:{commentId}` cache key could be added if profiling shows contention.
 - **Admin resolution:** The `admin:default` cache key always resolves to the first seeded ADMIN ordered by `created_at`. If multiple admins exist, only one receives job payloads. Confirming whether all admins should be notified (§12 assumption) would require extending the `CommentNotificationJobData` payload to carry an `adminIds` array.
 - **Comment editing and deletion:** Not in scope for this phase. If supported in the future, the list cache (`ticket:{ticketId}:comments`) must be invalidated on those mutations.
+- **BullMQ/auto-close cleanup (2026-07-08):** the `emailQueue`/`autoCloseQueue` BullMQ calls in `addComment()`, `src/config/queue.ts`, `src/jobs/queues.ts`, `AutoCloseJobData`, and `systemCloseTicket()` in `ticket.service.ts` are all dead code from before the direct-call/no-auto-close decision. Tracked for removal in `task.md` Phase 7/8.
 - **Auto-close MIME guard vs. upload middleware MIME guard:** The multer middleware (`upload.ts`) checks against the `ATTACHMENT_ALLOWED_MIME_TYPES` env variable. The service layer adds a second, hard-coded check that restricts screenshots specifically to `image/jpeg` and `image/png`. If `ATTACHMENT_ALLOWED_MIME_TYPES` is narrowed in the environment (e.g. set to only `image/png`), the multer guard will reject jpeg files before the service guard is reached.
 - **Virus/malware scanning:** Uploaded screenshots are not scanned. Scan integration is deferred (§12 assumption).

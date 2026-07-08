@@ -19,10 +19,15 @@ src/
     admin-seed.ts       npm run db:seed
   middlewares/
     errorHandler.ts     global 4-arg error handler (always last in app.ts)
+                        only module-independent middleware lives here (authenticate,
+                        requireRole, validateBody/Query) — module-coupled middleware
+                        (e.g. multer configs importing a module's schemas) lives in
+                        that module as {module}.middleware.ts instead
   modules/{module}/
     {module}.routes.ts      HTTP verb + path → controller only
     {module}.controller.ts  parse req → call service → send response
     {module}.service.ts     business logic + DB/cache calls
+    {module}.middleware.ts  middleware coupled to this module's schemas (optional)
   utils/
     response.ts         success() / error() — only way to send responses
 ```
@@ -44,7 +49,7 @@ src/
 |-------|------|
 | Security, Auth, RBAC, File Uploads | `.claude/rules/security.md` |
 | API Design, TypeScript, Code Structure, Testing | `.claude/rules/api-conventions.md` |
-| PostgreSQL, Redis, BullMQ | `.claude/rules/db-conventions.md` |
+| PostgreSQL, Redis, Email Notifications | `.claude/rules/db-conventions.md` |
 
 ## Environment Variables
 | Variable | Default | Notes |

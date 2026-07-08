@@ -3,9 +3,9 @@ import { Readable } from 'stream';
 import config from '../../config';
 import { query } from '../../config/postgres';
 import { deleteCache, getCache, setCache } from '../../config/redis';
-import { autoCloseQueue, emailQueue } from '../../jobs/queues';
+import { sendCommentNotificationEmail } from '../../jobs/notifications';
 import { buildStorageKey, getStorageBackend } from '../../storage';
-import type { AutoCloseJobData, CommentNotificationJobData } from '../../types/jobs';
+import type { CommentNotificationJobData } from '../../types/jobs';
 import type { UserRole } from '../auth/auth.schemas';
 import {
   getAttachmentsByComment,
@@ -24,7 +24,6 @@ function createHttpError(message: string, statusCode: number, code?: string): Er
 }
 
 const ALLOWED_SCREENSHOT_MIMES = new Set(['image/jpeg', 'image/png']);
-const NON_TERMINAL_STATUSES = ['OPEN', 'IN_PROGRESS'];
 
 function toScreenshotUrl(key: string | null): string | null {
   if (!key) return null;
@@ -185,32 +184,9 @@ export async function addComment(
       assigneeId: ticket.assignedTo,
       adminId,
     };
-    await emailQueue.add('comment-notification', emailPayload);
+    await sendCommentNotificationEmail(emailPayload);
   } catch (emailErr) {
-    console.error('[Queue] Failed to enqueue comment-notification email:', (emailErr as Error).message);
-  }
-
-  try {
-    if (ticket.assignedTo === callerId && NON_TERMINAL_STATUSES.includes(ticket.status)) {
-      const autoClosePayload: AutoCloseJobData = {
-        ticketId,
-        triggeringCommentId: comment.id,
-        assigneeId: ticket.assignedTo,
-        creatorId: ticket.createdBy,
-        adminId,
-      };
-      await autoCloseQueue.add('auto-close', autoClosePayload, {
-        delay: config.queue.autoCloseDelayMs,
-        jobId: `auto-close:${ticketId}`,
-        removeOnComplete: true,
-        removeOnFail: false,
-      });
-    } else if (ticket.createdBy === callerId && NON_TERMINAL_STATUSES.includes(ticket.status)) {
-      const job = await autoCloseQueue.getJob(`auto-close:${ticketId}`);
-      await job?.remove();
-    }
-  } catch (queueErr) {
-    console.error('[Queue] Failed to schedule/cancel auto-close job:', (queueErr as Error).message);
+    console.error('[Notify] Failed to send comment-notification email:', (emailErr as Error).message);
   }
 
   return comment;

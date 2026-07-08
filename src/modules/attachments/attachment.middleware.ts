@@ -1,6 +1,6 @@
 import multer from 'multer';
-import config from '../config';
-import { ALLOWED_ATTACHMENT_MIMES } from '../modules/attachments/attachment.schemas';
+import config from '../../config';
+import { ALLOWED_ATTACHMENT_MIMES } from './attachment.schemas';
 
 const uploadAttachments = multer({
   storage: multer.memoryStorage(),

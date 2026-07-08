@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 import config from '../../config';
 import { query, withTransaction } from '../../config/postgres';
 import { deleteCache, deleteCacheByPattern, getCache, setCache } from '../../config/redis';
+import { sendNewTicketEmail } from '../../jobs/notifications';
 import { getAttachmentsByTicket, uploadAttachments } from '../attachments/attachment.service';
 import {
   AssignPayload,
@@ -167,6 +168,17 @@ export async function createTicket(
     await invalidateTicketCache(ticketId);
   } catch (err) {
     console.error('[Cache] Post-create invalidation error:', (err as Error).message);
+  }
+
+  try {
+    await sendNewTicketEmail({
+      ticketId,
+      ticketTitle: dbRow.title,
+      creatorId,
+      adminId,
+    });
+  } catch (emailErr) {
+    console.error('[Notify] Failed to send new-ticket email:', (emailErr as Error).message);
   }
 
   return withAttachments(dbRow);
@@ -452,24 +464,4 @@ export async function assignTicket(ticketId: string, payload: AssignPayload): Pr
   await invalidateTicketCache(ticketId);
 
   return withAttachments(dbRow);
-}
-
-export async function systemCloseTicket(id: string): Promise<void> {
-  await withTransaction(async (client: PoolClient) => {
-    const result = await client.query<{ status: TicketStatus }>(
-      'SELECT status FROM tickets WHERE id = $1 FOR UPDATE',
-      [id],
-    );
-    const row = result.rows[0];
-    if (
-      !row ||
-      row.status === 'CLOSED' ||
-      row.status === 'CANCELLED' ||
-      row.status === 'RESOLVED'
-    ) {
-      return;
-    }
-    await client.query("UPDATE tickets SET status = 'CLOSED' WHERE id = $1", [id]);
-    await invalidateTicketCache(id);
-  });
 }

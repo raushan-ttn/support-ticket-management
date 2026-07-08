@@ -213,7 +213,7 @@ Do not write code yet.
 | [`auth-validation-upload.md`](plans/auth-validation-upload.md) | Zod, Passport, Multer, security middleware |
 | [`schema-alignment.md`](plans/schema-alignment.md) | ENUM casing fixes, `CANCELLED`/`URGENT`, `NOT NULL`, `attachments` table |
 | [`tickets-module.md`](plans/tickets-module.md) | Tickets CRUD, state machine, RBAC, comments, search/filter |
-| [`notifications-email.md`](plans/notifications-email.md) | BullMQ queue, SMTP email, auto-close delayed job |
+| [`notifications-email.md`](plans/notifications-email.md) | Direct (non-queued) SMTP email notifications; auto-close removed from scope |
 | [`attachments-module.md`](plans/attachments-module.md) | File upload/download/delete, storage abstraction (local + S3) |
 
 ### Requirements-to-plan gap checklist
@@ -224,9 +224,9 @@ Before implementing any feature from `.claude/requirements.md`, verify the plan 
 |-----------------|-----------|
 | RBAC | Only `ADMIN` and `AGENT` roles exist — no `user` role |
 | ENUM values | All DB enums use uppercase (`OPEN`, `IN_PROGRESS`, `ADMIN`, etc.) — see `schema-alignment.md` |
-| State machine | Only transitions in §7 are valid; `PATCH /status` enforces them; SM-6 system transition is not API-reachable |
+| State machine | Only transitions in §7 are valid; `PATCH /status` enforces them |
 | Auto-assignment | `assignedTo` is always server-set on create (never null); client-supplied value silently ignored |
-| Async notifications | Email delivery and auto-close scheduling are always fire-and-forget — failures log, never throw |
+| Async notifications | Email delivery is a direct, non-queued, fire-and-forget call — failures log, never throw |
 | Storage | Attachment bytes never go to Postgres or Redis; only metadata in Postgres, bytes in storage backend |
 | Error codes | Domain errors include a machine-readable `code` field (e.g. `INVALID_STATUS_TRANSITION`) |
 
@@ -255,18 +255,18 @@ Every domain module under `src/modules/{module}/` follows the same layering defi
 {module}.schemas.ts     → Zod validation schemas (when needed)
 ```
 
-### Queue/job pattern
+### Notification pattern (direct call, no queue)
 
 ```
-src/config/queue.ts         → BullMQ connection (separate ioredis instance from redis.ts)
-src/jobs/queues.ts          → named Queue exports (emailQueue, autoCloseQueue)
-src/jobs/emailWorker.ts     → processes email jobs (new-ticket, comment-notification)
-src/jobs/autoCloseWorker.ts → processes delayed auto-close jobs
-src/jobs/mailer.ts          → nodemailer transport factory (SMTP / jsonTransport in test)
+src/jobs/notifications.ts → sendNewTicketEmail(), sendCommentNotificationEmail() — direct calls
+src/jobs/mailer.ts        → nodemailer transport factory (SMTP / jsonTransport in test)
 ```
 
-Services enqueue jobs after DB commits — never in controllers. Queue adds are fire-and-forget
-(wrapped in try/catch; errors are logged, never re-thrown to the caller).
+Services call notification functions directly after DB commits — never in controllers.
+Calls are fire-and-forget (wrapped in try/catch; errors are logged, never re-thrown to
+the caller, and never retried). No job queue (BullMQ or otherwise) is used —
+`src/config/queue.ts` / `src/jobs/queues.ts` are dead code pending removal (`task.md`
+Phase 7/8 cleanup).
 
 ### Storage pattern
 
@@ -396,17 +396,10 @@ Follow assertion order from testing.md (status first).
 ### Notification testing (TEST-7)
 
 ```
-Write tests for the email worker using jsonTransport (NODE_ENV=test captures sent mail).
-Assert new-ticket job: sends to creator + admin, de-duplicated if same person.
-Assert comment-notification job: excludes comment author from recipient set.
-```
-
-### Auto-close testing (TEST-8)
-
-```
-Write tests for autoCloseWorker with AUTO_CLOSE_DELAY_MS=0 (injectable delay).
-Cover: (a) assignee comment schedules job; (b) creator reply cancels it;
-(c) deadline fires → ticket CLOSED; (d) last-moment creator reply → FR-12c no-op.
+Write tests for sendNewTicketEmail()/sendCommentNotificationEmail() using jsonTransport
+(NODE_ENV=test captures sent mail) — direct function calls, no queue/worker.
+Assert new-ticket send: sends to creator + admin, de-duplicated if same person.
+Assert comment-notification send: excludes comment author from recipient set.
 ```
 
 ### Attachment testing (TEST-9)

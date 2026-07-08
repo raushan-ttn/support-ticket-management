@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_attachments_comment_id ON attachments(comment_id)
 
 ## New Config Sections (`src/config/index.ts`)
 
-### SMTP (for BullMQ email worker)
+### SMTP (for direct, non-queued email notifications — see `notifications-email.md`)
 
 | Variable | Default | Notes |
 |----------|---------|-------|
@@ -125,13 +125,15 @@ CREATE INDEX IF NOT EXISTS idx_attachments_comment_id ON attachments(comment_id)
 | `SMTP_FROM` | `noreply@ttn.com` | |
 | `SMTP_SECURE` | `false` | `true` for TLS in prod |
 
-### Queue (BullMQ reuses the same Redis instance)
+### Queue — removed 2026-07-08 (BullMQ no longer used)
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `QUEUE_CONCURRENCY` | `5` | Worker concurrency |
-| `QUEUE_ATTEMPTS` | `3` | Retry attempts per job |
-| `QUEUE_BACKOFF_MS` | `5000` | Exponential backoff base |
+| `QUEUE_CONCURRENCY` | `5` | **Unused** — worker concurrency for a BullMQ worker that was never built; no queue is used |
+| `QUEUE_ATTEMPTS` | `3` | **Unused** — retry attempts per job; direct email calls have no retry |
+| `QUEUE_BACKOFF_MS` | `5000` | **Unused** — exponential backoff base; not applicable without a queue |
+
+These three should be removed from `src/config/index.ts` and `.sample.env` as part of the Phase 7/8 cleanup (`task.md`).
 
 ### Storage (attachment backend)
 

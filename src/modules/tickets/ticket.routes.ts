@@ -2,9 +2,9 @@ import { Router } from 'express';
 
 import authenticate from '../../middlewares/authenticate';
 import { requireRole } from '../../middlewares/requireRole';
-import { uploadAttachmentFiles } from '../../middlewares/uploadAttachments';
 import { validateBody } from '../../middlewares/validateBody';
 import { validateQuery } from '../../middlewares/validateQuery';
+import { uploadAttachmentFiles } from '../attachments/attachment.middleware';
 import * as controller from './ticket.controller';
 import {
   assignSchema,

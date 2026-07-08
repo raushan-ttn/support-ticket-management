@@ -155,7 +155,7 @@ IN_PROGRESS  -> CANCELLED
 
 `CLOSED` and `CANCELLED` are terminal states (SM-3): no outgoing transitions. Illegal transitions will return `409 INVALID_STATUS_TRANSITION` once the transition-validation logic is implemented in Phase 4.
 
-Additionally, SM-6 defines a **system-only** privileged transition `{OPEN, IN_PROGRESS} -> CLOSED` used exclusively by the auto-close background job (FR-12). This transition is never reachable via the public status endpoint.
+Additionally, SM-6 defined a **system-only** privileged transition `{OPEN, IN_PROGRESS} -> CLOSED` for the auto-close background job (formerly FR-12). **Removed 2026-07-08:** auto-close was dropped from scope (required a BullMQ delayed-job queue not part of this implementation — `requirements.md` §1.2). `systemCloseTicket()` in `ticket.service.ts` still implements this transition but is dead code pending removal (`task.md` Phase 8).
 
 ---
 

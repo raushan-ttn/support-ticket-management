@@ -2,7 +2,7 @@
 
 ## Problem
 
-Implement Phase 4 of the Support Ticket Management backend: the full ticket lifecycle (create, list, get, update, status transition, assign) with RBAC-scoped access, server-authoritative state machine, keyword search, pagination, and Redis caching. This is the central domain module — comments, attachments, notifications, and auto-close all depend on it.
+Implement Phase 4 of the Support Ticket Management backend: the full ticket lifecycle (create, list, get, update, status transition, assign) with RBAC-scoped access, server-authoritative state machine, keyword search, pagination, and Redis caching. This is the central domain module — comments, attachments, and notifications all depend on it (auto-close was later removed from scope).
 
 ---
 
@@ -193,9 +193,12 @@ Run inside `withTransaction`:
 4. `UPDATE tickets SET status = $2 WHERE id = $1`.
 5. Invalidate cache.
 
-### `systemCloseTicket(id)` — SM-6 (internal, not exported to controller)
+### `systemCloseTicket(id)` — SM-6 (internal, not exported to controller) — dead code, pending removal
 
-Used only by auto-close job worker (Phase 8). Skips user RBAC; validates `{OPEN, IN_PROGRESS} → CLOSED` only.
+Was intended for the auto-close job worker (formerly Phase 8), which is now **removed
+from scope** (required a BullMQ delayed-job queue not part of this implementation —
+`requirements.md` §1.2). This function is implemented in code but unreachable by
+anything; tracked for removal in `task.md` Phase 8.
 
 ### `assignTicket(ticketId, targetUserId)` — FR-7
 
@@ -285,7 +288,7 @@ RESOLVED → CLOSED
 OPEN → CANCELLED
 IN_PROGRESS → CANCELLED
 
-[system-only] OPEN | IN_PROGRESS → CLOSED  (auto-close job, Phase 8)
+[system-only, dead code] OPEN | IN_PROGRESS → CLOSED  (was for the removed auto-close job, formerly Phase 8)
 ```
 
 Invalid transitions → `409 Conflict`:

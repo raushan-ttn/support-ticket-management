@@ -26,6 +26,10 @@ jest.mock('../attachments/attachment.service', () => ({
   uploadAttachments: jest.fn(),
 }));
 
+jest.mock('../../jobs/notifications', () => ({
+  sendNewTicketEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockQuery = query as jest.MockedFunction<typeof query>;
 const mockWithTransaction = withTransaction as jest.MockedFunction<typeof withTransaction>;
 const mockGetCache = getCache as jest.MockedFunction<typeof getCache>;

@@ -128,3 +128,18 @@ Implemented three comment endpoints enabling users to add comments with optional
 None
 
 ---
+
+## 2026-07-08 — Decision: Drop BullMQ, Email Sent Directly, Auto-Close Removed From Scope
+
+**Branch:** attachments_setup
+**Requirements:** `requirements.md` §1.2 Out of Scope (removed TS-8, former §5.5/FR-12/SM-6/SM-7/NFR-9/NFR-10/TEST-8)
+
+### What changed
+Email notifications (Phase 7) will be sent via a **direct, non-queued call** from the service layer instead of through a BullMQ `email` queue/worker. The auto-close-on-stale-reply feature (formerly Phase 8 / FR-12), which required a Redis-backed BullMQ delayed-job queue, is **removed from scope** rather than deferred. See `requirements.md` §1.2, `.claude/plans/notifications-email.md`, and `task.md` Phase 7/8.
+
+This is a planning/documentation change only — no source files were modified in this entry. The comments module entry above (2026-07-01) predates this decision: `comment.service.ts` still contains the `emailQueue.add()` / `autoCloseQueue.add()` calls it describes, `ticket.service.ts` still contains `systemCloseTicket()` (SM-6), and `src/config/queue.ts` / `src/jobs/queues.ts` / `src/types/jobs.ts`'s `AutoCloseJobData` still exist. All of this is now **dead code pending removal** — tracked in `task.md` Phase 7/8 cleanup items, to be removed alongside the direct-email implementation.
+
+### Breaking changes
+None yet (docs/plans only). The pending code cleanup will remove `bullmq` as a dependency and delete `src/config/queue.ts`, `src/jobs/queues.ts`, and `AutoCloseJobData`.
+
+---
