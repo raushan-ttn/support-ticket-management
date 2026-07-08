@@ -51,9 +51,9 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Phase 3 — Config Additions & Queue Setup
 
-- [x] Extend `src/config/index.ts` with SMTP, BullMQ, storage, and attachment-limit config sections — TS-7, TS-8, TS-9, VAL-6
+- [x] Extend `src/config/index.ts` with SMTP, storage, and attachment-limit config sections — TS-7, TS-9, VAL-6
 - [x] Add storage + attachment-limit vars to `.sample.env` — TS-9, VAL-6
-- [x] `src/config/queue.ts` — BullMQ `ConnectionOptions` (dedicated ioredis connection, NOT the cache singleton) — TS-8, db-conventions.md
+- [x] ~~`src/config/queue.ts` — BullMQ `ConnectionOptions`~~ — **removed 2026-07-08**, BullMQ dropped from scope; see Phase 7/8 cleanup items
 
 ---
 
@@ -95,12 +95,12 @@ Traceable to `requirements.md`. Check off items as they are completed.
   - [x] `createCommentSchema` (message non-empty via text field; screenshot is a multer file, not a Zod field) — FR-8, VAL-2, DM-13a
   - [x] `CommentRow` response interface — include `id`, `ticketId`, `message`, `screenshot: string | null`, `createdBy`, `createdAt`
 - [x] `src/modules/comments/comment.service.ts`
-  - [x] `addComment()` — verify ticket exists (404); verify caller scope (403); store screenshot file via storage backend if provided (FR-8b); insert row; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, FR-8b, CACHE-5, FR-11
+  - [x] `addComment()` — verify ticket exists (404); verify caller scope (403); store screenshot file via storage backend if provided (FR-8b); insert row; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, FR-8b, CACHE-5, FR-11 — **queue call is dead code, see Phase 7 cleanup item**
   - [x] `listComments()` — admin sees all; agent scoped; ordered by `created_at ASC`; include `screenshot` in SELECT — FR-9, FR-6, RBAC-3/4
   - [x] `getCommentById()` — return single comment with `screenshot`; 404 if not found or wrong ticket — FR-9a
   - [x] Cache: `getCache/setCache` for `ticket:{id}:comments`; invalidate on new comment — CACHE-2, CACHE-5
-  - [x] Auto-close scheduling: after assignee comment on non-terminal ticket, enqueue/replace delayed `auto-close:{ticketId}` job — FR-12f
-  - [x] Creator reply: remove pending `auto-close:{ticketId}` job — FR-12a
+  - [x] ~~Auto-close scheduling: after assignee comment on non-terminal ticket, enqueue/replace delayed `auto-close:{ticketId}` job~~ — **removed from scope 2026-07-08; code still present, see Phase 8 cleanup item**
+  - [x] ~~Creator reply: remove pending `auto-close:{ticketId}` job~~ — **removed from scope 2026-07-08; code still present, see Phase 8 cleanup item**
 - [x] `src/modules/comments/comment.controller.ts` — `add`, `list`, `getById`
 - [x] `src/modules/comments/comment.routes.ts` — mounted under `tickets.routes.ts`
   - [x] `GET /:id/comments` (`authenticate`, `list`)
@@ -133,33 +133,36 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ---
 
-## Phase 7 — Notifications (Email + BullMQ)
+## Phase 7 — Notifications (Email, Direct — No Queue)
 
-- [ ] **Packages:** `bullmq`, `nodemailer`, `@types/nodemailer` — TS-7, TS-8
-- [x] `src/jobs/queues.ts` — define `emailQueue` and `autoCloseQueue` using `src/config/queue.ts` connection — TS-8
-- [ ] `src/jobs/mailer.ts` — Nodemailer transport factory (SMTP for prod, JSON/in-memory for `test`, Mailhog for dev) — TS-7, TEST-7
-- [ ] `src/jobs/emailWorker.ts` — BullMQ Worker consuming `email` queue
-  - [ ] `new-ticket` job type: email creator + admin; de-duplicate recipients — FR-10
-  - [ ] `comment-notification` job type: email creator + current assignee + admin, exclude comment author — FR-11, FR-11a, FR-11b
-  - [ ] `auto-close-notification` job type: email creator + assignee + admin on auto-close — FR-12e
-  - [ ] Retry with exponential backoff; log failures; never re-throw — NFR-8
-- [ ] Enqueue `new-ticket` job in `ticket.service.createTicket()` (fire-and-forget try/catch) — FR-10, NFR-8
-- [ ] Enqueue `comment-notification` job in `comment.service.addComment()` — FR-11
-- [ ] Graceful degradation: queue unavailable → log + skip, core API continues — NFR-11
+> **Decision (2026-07-08):** email notifications are sent via a direct, non-queued
+> call (fire-and-forget) — no BullMQ, no job queue at all. See `requirements.md` §5.4.
+
+- [x] **Packages:** `nodemailer`, `@types/nodemailer` — TS-7
+- [x] `src/jobs/mailer.ts` — Nodemailer transport factory (SMTP for prod, JSON/in-memory for `test`, Mailhog for dev) — TS-7, TEST-7
+- [x] `src/jobs/notifications.ts` — direct email-sending functions (no queue/worker)
+  - [x] `sendNewTicketEmail()`: email creator + admin; de-duplicate recipients — FR-10
+  - [x] `sendCommentNotificationEmail()`: email creator + current assignee + admin, exclude comment author — FR-11, FR-11a, FR-11b
+  - [x] Fire-and-forget: wrap in `try/catch`, log failure, never re-throw — NFR-8 (no retry/backoff without a queue)
+- [x] Call `sendNewTicketEmail()` directly in `ticket.service.createTicket()` (fire-and-forget try/catch) — FR-10, NFR-8
+- [x] Call `sendCommentNotificationEmail()` directly in `comment.service.addComment()` — FR-11
+- [x] Graceful degradation: SMTP unavailable → log + skip, core API continues — NFR-11
+- [x] **Cleanup:** removed `src/jobs/queues.ts` and `src/config/queue.ts` (BullMQ `emailQueue`, no longer used); removed `emailQueue.add('comment-notification', …)` call from `comment.service.ts` `addComment()`, replaced with the direct `sendCommentNotificationEmail()` call above; removed `bullmq` from `package.json`
 
 ---
 
-## Phase 8 — Auto-Close Background Job
+## Phase 8 — Auto-Close Background Job — Removed From Scope
 
-- [ ] `src/jobs/autoCloseWorker.ts` — BullMQ Worker consuming `auto-close` queue (delayed jobs)
-  - [ ] Execution-time re-validation: re-read ticket from Postgres; only close if non-terminal, most recent comment is assignee's, ≥48h elapsed — FR-12c, SM-6, SM-7
-  - [ ] Perform system-only transition `OPEN|IN_PROGRESS → CLOSED` with `actor = 'system'` — FR-12d, SM-6
-  - [ ] Enqueue `auto-close-notification` email job — FR-12e
-  - [ ] No-op if conditions no longer hold — NFR-10
-- [ ] In `comment.service.addComment()`:
-  - [ ] Assignee comment on non-terminal ticket → `autoCloseQueue.add('auto-close', payload, { delay: 48h, jobId: 'auto-close:{ticketId}' })` — FR-12, FR-12b, FR-12f
-  - [ ] Creator comment → remove pending `auto-close:{ticketId}` job — FR-12a, FR-12f
-- [ ] Register both workers at app startup (`bin/www.ts`) — TS-8
+> **Removed 2026-07-08** (not deferred — dropped). Required a Redis-backed BullMQ
+> delayed-job queue, which is not part of this implementation. See `requirements.md`
+> §1.2 Out of Scope / former §5.5.
+
+- [x] **Cleanup (dead code from before this decision):**
+  - [x] Removed `systemCloseTicket()` from `src/modules/tickets/ticket.service.ts` (implemented the now-removed SM-6 system-only transition)
+  - [x] Removed the `autoCloseQueue.add('auto-close', …)` / `autoCloseQueue.getJob(...)`/`.remove()` calls from `comment.service.ts` `addComment()` (assignee-schedules / creator-cancels logic)
+  - [x] Removed `autoCloseQueue` export by deleting `src/jobs/queues.ts` entirely (alongside the Phase 7 cleanup item)
+  - [x] Removed `AutoCloseJobData` from `src/types/jobs.ts`
+  - [x] Removed `AUTO_CLOSE_DELAY_MS` config (`src/config/index.ts`) and `.sample.env` entry
 
 ---
 
@@ -172,16 +175,10 @@ Traceable to `requirements.md`. Check off items as they are completed.
 - [ ] **RBAC scoping (TEST-3):** admin lists all tickets; agent list correctly scoped — FR-2a, SF-5
 - [ ] **Assignment (TEST-4):** `403` for agent caller; `400` for non-existent target user — FR-7
 - [ ] **Validation (TEST-5):** rejects missing/empty `title`, `description`, `message`; invalid enum values — VAL-2/VAL-3
-- [ ] **Notifications (TEST-7)**
-  - [ ] New-ticket job: sent to creator + admin; de-duplicated if same person — FR-10
-  - [ ] Comment-notification job: excludes comment author; correct recipient set for all role combos — FR-11
+- [ ] **Notifications (TEST-7)** — direct call, no queue
+  - [ ] New-ticket send: sent to creator + admin; de-duplicated if same person — FR-10
+  - [ ] Comment-notification send: excludes comment author; correct recipient set for all role combos — FR-11
   - [ ] Uses captured/JSON transport — no real mail sent — TS-7
-- [ ] **Auto-close (TEST-8)**
-  - [ ] (a) Assignee comment schedules delayed job with `jobId = auto-close:{ticketId}` — FR-12
-  - [ ] (b) Creator reply within window cancels the job — FR-12a
-  - [ ] (c) Deadline fires with no creator reply → `CLOSED` via system transition; notification enqueued — FR-12c/d/e
-  - [ ] (d) Last-moment creator reply → execution-time re-validation → ticket unchanged — FR-12c
-  - [ ] Uses injectable `AUTO_CLOSE_DELAY_MS=0` for test speed
 - [ ] **Attachments (TEST-9)**
   - [ ] Allowed PNG/JPG within size limit → attachment metadata row created; `storageKey` absent from response; `url` present — FR-13
   - [ ] Disallowed MIME (e.g. PDF, GIF) → `415`; oversize → `400`; over file count → `400` — VAL-6, FR-13b
@@ -206,12 +203,9 @@ Traceable to `requirements.md`. Check off items as they are completed.
 - [ ] Redis cache accelerates reads; degrades gracefully when unavailable
 - [ ] No secrets committed
 - [ ] State-machine integration tests pass
-- [ ] New ticket emails creator + admin (async, non-blocking)
+- [ ] New ticket emails creator + admin (async, non-blocking, direct call — no queue)
 - [ ] New comment emails all involved parties, de-duplicated, excluding author
-- [ ] Notification failures retried/logged; never fail the originating request
-- [ ] Assignee comment with no creator reply within 48h auto-closes the ticket
-- [ ] Creator reply within window prevents auto-close; re-validated at execution time
-- [ ] Auto-close notifies involved parties
+- [ ] Notification failures logged; never fail the originating request (no retry — direct call, not queued)
 - [ ] PNG/JPG files uploadable to a ticket or comment via ticket/comment mutation endpoints; metadata in Postgres, bytes in storage backend
 - [ ] Upload rejects non-PNG/JPG MIME types, oversize files, and over-count requests
 - [ ] Attachment metadata (including direct-access `url`) returned inline in ticket detail and comment list/detail responses

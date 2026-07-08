@@ -160,11 +160,10 @@ export const validateBody = (schema: ZodSchema) =>
 |-------|---------------|-----------|
 | **Routes** | HTTP verb + path → middleware chain → controller | Logic, SQL, config imports |
 | **Controllers** | Parse `req`, call one service method, send response | SQL, cache calls, `res.json()` in catch |
-| **Services** | Business logic, DB queries, cache, queue enqueue | `req`, `res` references |
-| **Job workers** | Consume queue jobs, call service functions | `req`, `res`, controller calls |
+| **Services** | Business logic, DB queries, cache, direct notification sends | `req`, `res` references |
 | **Storage** | Read/write bytes to backend | Business logic, DB queries |
 
-SQL in a controller or route is a violation. Queue adds are in services only, fire-and-forget (try/catch; never re-throw).
+SQL in a controller or route is a violation. Notification sends are in services only, fire-and-forget (try/catch; never re-throw).
 
 ## Module Structure
 
@@ -172,17 +171,22 @@ SQL in a controller or route is a violation. Queue adds are in services only, fi
 src/modules/{module}/
   {module}.routes.ts      → route definitions + middleware
   {module}.controller.ts  → req → service → success()/error()
-  {module}.service.ts     → business logic + DB/cache/queue
+  {module}.service.ts     → business logic + DB/cache/notification calls
   {module}.schemas.ts     → Zod schemas + inferred types + response interfaces
+  {module}.middleware.ts  → middleware coupled to this module's schemas (optional —
+                             e.g. a multer config that imports the module's mime
+                             allowlist); module-independent middleware never goes here
 
 src/jobs/
-  queues.ts / emailWorker.ts / autoCloseWorker.ts / mailer.ts
+  mailer.ts / notifications.ts
 
 src/storage/
   index.ts (IStorageBackend + factory) / local.ts / s3.ts
 ```
 
-Modules: `auth`, `users`, `tickets`, `comments`, `attachments`. Shared logic → `src/utils/`; middleware → `src/middlewares/`.
+Modules: `auth`, `users`, `tickets`, `comments`, `attachments`. Shared logic → `src/utils/`.
+
+**Middleware placement:** `src/middlewares/` holds only middleware with zero module imports (`authenticate`, `errorHandler`, `requireRole`, `validateBody`, `validateQuery`). Middleware that imports from a specific module (e.g. that module's `.schemas.ts`) belongs in that module as `{module}.middleware.ts`, not in `src/middlewares/`.
 
 ## File & Naming Conventions
 
@@ -217,7 +221,7 @@ Only when the **why** is non-obvious. Never describe what the code does.
 - Controllers always `Promise<void>`; use `interface` for shapes, `type` for unions only
 - No `any` — use `unknown` + type guards. No `!` without proof — prefer `?.`
 - Guard pg `rowCount`: `if (result.rowCount && result.rowCount > 0)`
-- All I/O: `async/await` — no callbacks or `.then()`. Exception: BullMQ `.add()` is fire-and-forget
+- All I/O: `async/await` — no callbacks or `.then()`. Exception: notification sends (`sendNewTicketEmail()`, `sendCommentNotificationEmail()`) are fire-and-forget
 - Imports: ES `import` only; group built-ins → third-party → internal; `* as` for services; destructure for types
 
 **Exports:**
@@ -273,16 +277,9 @@ Scripts: `"test": "jest"` · `"test:watch": "jest --watch"` · `"test:coverage":
 | Job workers | 80% |
 
 ### Notification Tests (TEST-7)
-`NODE_ENV=test` activates `jsonTransport`; call worker handlers directly. Assert:
-- New-ticket job sends to creator + admin; de-duplicated if same person
+`NODE_ENV=test` activates `jsonTransport`; call `sendNewTicketEmail()` / `sendCommentNotificationEmail()` directly (no queue/worker). Assert:
+- New-ticket send goes to creator + admin; de-duplicated if same person
 - Comment-notification excludes the comment author; correct recipient set for all role combos
-
-### Auto-Close Tests (TEST-8)
-`AUTO_CLOSE_DELAY_MS=0`; call worker handler directly. Assert all four cases:
-- **(a)** Assignee comment → delayed job scheduled with `jobId = auto-close:{ticketId}`
-- **(b)** Creator reply → job removed from delayed queue
-- **(c)** Deadline fires, no creator reply → `ticket.status === 'CLOSED'`
-- **(d)** Creator replies before job executes → FR-12c re-validation → status unchanged
 
 ### Attachment Tests (TEST-9)
 `STORAGE_BACKEND=local`, `STORAGE_LOCAL_DIR=.tmp/test-uploads`; clean up in `afterAll`. Assert:

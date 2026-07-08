@@ -1,7 +1,18 @@
 # Plan: Comments Module (Phase 5)
 
-> **Requirements:** FR-8, FR-8a, FR-8b, FR-9, FR-9a, FR-11, FR-11a, FR-11b, FR-12, FR-12a, FR-12b, FR-12c, FR-12d, FR-12e, FR-12f, DM-6, DM-7, DM-13, DM-13a, VAL-1, VAL-2, RBAC-3, RBAC-4, RBAC-6, CACHE-2, CACHE-5, CACHE-7, SM-6, SM-7, TEST-7, TEST-8
+> **Requirements:** FR-8, FR-8a, FR-8b, FR-9, FR-9a, FR-11, FR-11a, FR-11b, DM-6, DM-7, DM-13, DM-13a, VAL-1, VAL-2, RBAC-3, RBAC-4, RBAC-6, CACHE-2, CACHE-5, CACHE-7, TEST-7
 > **Date:** 2026-07-01
+>
+> **Superseded (2026-07-08):** This plan was executed as written, including the
+> BullMQ queue/auto-close design described throughout (queue setup, `FR-12`/`SM-6`
+> auto-close scheduling, `TEST-8`). That design has since been **removed from scope**
+> — see `requirements.md` §1.2 and `.claude/plans/notifications-email.md`. The BullMQ
+> queue setup and auto-close scheduling code this plan produced (`src/config/queue.ts`,
+> `src/jobs/queues.ts`, the `autoCloseQueue`/`emailQueue` calls in
+> `comment.service.ts`) is now **dead code pending removal** — tracked in `task.md`
+> Phase 7/8. The rest of this document (schema, endpoints, RBAC, caching) remains
+> accurate as historical record of what was built; only the queue/auto-close portions
+> below are obsolete.
 
 ---
 

@@ -1,8 +1,8 @@
 import { Router } from 'express';
 
 import authenticate from '../../middlewares/authenticate';
-import { uploadCommentFiles } from '../../middlewares/uploadCommentFiles';
 import { validateBody } from '../../middlewares/validateBody';
+import { uploadCommentFiles } from './comment.middleware';
 import * as controller from './comment.controller';
 import { createCommentSchema } from './comment.schemas';
 

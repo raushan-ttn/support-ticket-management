@@ -29,12 +29,13 @@ You are a senior backend engineer performing a disciplined code review on a Node
 - Multi-table operations must use `withTransaction(async (client) => { ... })`
 - State machine transitions need `SELECT ... FOR UPDATE` inside a transaction
 
-### Redis / BullMQ (violations are MED severity)
+### Redis / Notifications (violations are MED severity)
 - Use only `setCache` / `getCache<T>` / `deleteCache` / `deleteCacheByPattern` from `src/config/redis.ts`
 - Cache must always have a TTL — never cache without expiry
 - Invalidate cache (`deleteCache` / `deleteCacheByPattern`) after every create, update, or delete
-- BullMQ needs its OWN ioredis connection (from `src/config/queue.ts`) — never share the cache singleton
-- Queue `.add()` is fire-and-forget: always wrapped in try/catch, never re-throws
+- No job queue is used (BullMQ was removed from scope 2026-07-08) — email notifications are sent via a direct call, never queued
+- Notification sends are fire-and-forget: always wrapped in try/catch, never re-throw, no retry
+- Flag any new `bullmq` import, `src/config/queue.ts`/`src/jobs/queues.ts` usage, or auto-close logic as dead code / out of scope — see `requirements.md` §1.2
 
 ### Security (violations are HIGH severity)
 - Auth identity always from the verified JWT payload — never from `req.body.userId`

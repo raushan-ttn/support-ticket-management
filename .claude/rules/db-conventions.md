@@ -1,6 +1,6 @@
 # DB Conventions
 
-Covers: PostgreSQL queries and schema, Redis caching, and BullMQ job queue.
+Covers: PostgreSQL queries and schema, Redis caching, and direct (non-queued) email notifications.
 
 ---
 
@@ -82,32 +82,19 @@ await client.query('SELECT status FROM tickets WHERE id = $1 FOR UPDATE', [id]);
 
 ---
 
-## BullMQ (Job Queue)
+## Email Notifications (Direct, No Queue)
 
-BullMQ reuses the same Redis server as the cache but requires its **own dedicated ioredis connection** — BullMQ controls connection lifecycle and cannot share the `redis` singleton from `src/config/redis.ts`.
-
-### Connection (`src/config/queue.ts`)
-```ts
-import { ConnectionOptions } from 'bullmq';
-import { config } from './index';
-
-export const connection: ConnectionOptions = {
-  host: config.redis.host,
-  port: config.redis.port,
-  password: config.redis.password || undefined,
-  db: config.redis.db,          // same Redis DB — BullMQ uses its own key namespace (bull:)
-};
-```
-
-### Queues
-| Queue name | Purpose |
-|------------|---------|
-| `email` | New-ticket and comment-notification emails |
-| `auto-close` | Delayed ticket auto-close jobs keyed by `ticketId` |
+> **Decision (2026-07-08):** No job queue (BullMQ or otherwise) is used. Email is sent
+> via a direct call from the service layer. See `requirements.md` §5.4 and
+> `.claude/plans/notifications-email.md`.
 
 ### Rules
-- Queue adds happen in **services** after a successful DB write — never in controllers
-- Always wrap queue `.add()` in try/catch; log failure but never re-throw (fire-and-forget)
-- Job failures are retried with exponential backoff — they never fail the originating API request
-- If Redis is unavailable, queue adds are skipped and logged — core ticket/comment APIs continue
-- The auto-close job uses `jobId = 'auto-close:{ticketId}'` to ensure only one pending close per ticket; adding with the same `jobId` replaces the existing delayed job
+- Notification sends (`sendNewTicketEmail()`, `sendCommentNotificationEmail()`) happen in **services** after a successful DB write — never in controllers
+- Always wrap the send call in try/catch; log failure but never re-throw (fire-and-forget) — a failed send is **not** retried
+- If SMTP is unavailable, the send is skipped and logged — core ticket/comment APIs continue
+
+> **Note (2026-07-08):** `src/config/queue.ts`, `src/jobs/queues.ts` (BullMQ
+> connection/queue definitions), the auto-close scheduling calls in `comment.service.ts`,
+> and `systemCloseTicket()` in `ticket.service.ts` have been removed — see `task.md`
+> Phase 7/8 cleanup items (completed). Auto-close-on-stale-reply is out of scope
+> (`requirements.md` §1.2) — it would have required a Redis-backed delayed-job queue.

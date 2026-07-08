@@ -23,6 +23,12 @@ incoming tickets and assigns them to the agent responsible for the work.
 - Frontend application, components, and UI error rendering.
 - User self-registration / user-management UI (users are **seeded only**).
 - SLA timers, audit exports.
+- **Auto-close-on-stale-reply background job** (formerly FR-12/§5.5). **Removed
+  2026-07-08.** Required a Redis-backed delayed-job queue (BullMQ), which is not part
+  of this implementation. Partial groundwork (`systemCloseTicket()` in
+  `ticket.service.ts`, the SM-6 system transition, and the `autoCloseQueue`
+  schedule/cancel calls in `comment.service.ts`) predates this decision and is now
+  **dead code** — see `task.md` Phase 8 for the cleanup item.
 
 > **In scope:** Email/notification delivery (§5.4) and file attachments (§3.4, §5.6).
 
@@ -39,7 +45,7 @@ incoming tickets and assigns them to the agent responsible for the work.
 | TS-5  | All connection strings and secrets are supplied via environment variables; an `.env.example` documents every required variable. No secrets committed. |
 | TS-6  | The service must start successfully and serve health checks even if Redis is unavailable (graceful cache degradation — see CACHE-7). It must **not** start if Postgres is unreachable. |
 | TS-7  | **Email transport (SMTP).** Outbound notifications are sent via a configurable SMTP transport (env-driven). Dev/test may use a capture transport (e.g. Mailhog, or an in-memory/console transport) — no real mail in tests. |
-| TS-8  | **Redis-backed job queue (e.g. BullMQ).** Asynchronous email delivery (§5.4) and the delayed auto-close job (§5.5) run on a Redis-backed queue, reusing the Redis instance from TS-2. |
+| TS-8  | *(Removed 2026-07-08 — see §1.2 Out of Scope.)* Previously: Redis-backed job queue (BullMQ) for async email delivery and the delayed auto-close job. Email (§5.4) is now sent via a direct, non-queued call. No BullMQ queue is part of this implementation. |
 | TS-9  | **File storage backend.** Attachment binaries are stored in an object/file store — local filesystem (`public/uploads/` directory, served as static files via `express.static`) for dev, S3-compatible object storage for prod — selected via `STORAGE_BACKEND` env config. The storage backend returns a public-accessible URL (`url`) for each saved file; no separate download endpoint is required. **Binaries are never stored in Postgres** (Postgres holds metadata only) and **never cached in Redis** (CACHE-9). Multipart upload handling is required. |
 
 ---
@@ -185,32 +191,34 @@ requirement; the API must be able to establish who is calling and with what role
 
 ### 5.4 Notification Requirements (Email)
 
-All emails are sent **asynchronously** via the job queue (TS-8); they never block or
-fail the originating API request (NFR-8). Recipient sets are **de-duplicated** — a user
-who fills more than one role (e.g. creator who is also admin) receives a single email.
+> **Implementation note:** email notifications are sent via a **direct, non-queued
+> call** from the service layer — no job queue. The call is fire-and-forget
+> (`try/catch`, never awaited into the response path in a way that can fail the
+> request) so the intent of NFR-8 (never block/fail the request) is preserved, but
+> there is **no retry-with-backoff**: a failed send is logged once and dropped.
+
+All emails are sent **asynchronously** (fire-and-forget, off the request path); they
+never block or fail the originating API request (NFR-8). Recipient sets are
+**de-duplicated** — a user who fills more than one role (e.g. creator who is also admin)
+receives a single email.
 
 | ID    | Requirement |
 |-------|-------------|
-| **FR-10** | **New-ticket notification.** On successful ticket creation (FR-1), enqueue an email to the **ticket creator** and the **admin**. (At creation `assignedTo` is the admin per FR-1, so this set is effectively creator + assignee-admin.) The email identifies the ticket (id, title, priority). |
-| **FR-11** | **Comment notification.** On a new comment (FR-8), enqueue an email to **everyone involved in the ticket — creator, current assignee, and admin** — **excluding the comment's author** (no self-notification). The email identifies the ticket and includes the comment message. |
+| **FR-10** | **New-ticket notification.** On successful ticket creation (FR-1), send an email to the **ticket creator** and the **admin**. (At creation `assignedTo` is the admin per FR-1, so this set is effectively creator + assignee-admin.) The email identifies the ticket (id, title, priority). |
+| **FR-11** | **Comment notification.** On a new comment (FR-8), send an email to **everyone involved in the ticket — creator, current assignee, and admin** — **excluding the comment's author** (no self-notification). The email identifies the ticket and includes the comment message. |
 | FR-11a | Recipient resolution reads the ticket's *current* `assignedTo` at the time the comment is posted, not a cached/stale value. |
 | FR-11b | If the triggering ticket/comment carries attachments, the email notes their count and filenames (the files themselves are not emailed — recipients download via the API). |
 
-### 5.5 Auto-Close on Stale Reply (Background Job)
+### 5.5 Auto-Close on Stale Reply — Removed From Scope
 
-> **Design conflict flagged:** This feature requires moving a ticket to `CLOSED` from a
-> non-`RESOLVED` state, which the signature state machine (§7) does not permit. It is
-> reconciled here as a **system-only transition** (SM-6). See §7 and Assumptions §12.
-
-| ID    | Requirement |
-|-------|-------------|
-| **FR-12** | **Auto-close trigger.** When the **assignee** posts a comment on a non-terminal ticket (`OPEN` or `IN_PROGRESS`) and the **creator does not reply within 48 hours**, the system transitions the ticket to `CLOSED`. |
-| FR-12a | A **creator** comment posted before the deadline **cancels** the pending auto-close. |
-| FR-12b | A further **assignee** comment (with no intervening creator reply) **resets** the 48h window, measured from the latest such assignee comment. |
-| FR-12c | **Execution-time re-validation.** When the deadline fires, the job re-reads the ticket from Postgres and only closes it if, *at that moment*: the ticket is still non-terminal, the most recent comment is from the assignee (no creator reply after it), and ≥48h have elapsed. Otherwise the job is a no-op. This prevents closing a ticket whose creator replied at the last moment (race safety). |
-| FR-12d | Auto-close is performed via the privileged **system transition** (SM-6), recorded as a status change with actor = `system`. It is never reachable through the public status endpoint. |
-| FR-12e | On auto-close, enqueue a notification to involved parties (creator, assignee, admin) that the ticket was auto-closed for inactivity. |
-| FR-12f | **Implementation:** the deadline is a Redis-backed **delayed job** keyed by `ticketId`. Creator replies remove the pending job (FR-12a); new assignee comments replace it (FR-12b). |
+*(Removed 2026-07-08 — see §1.2 Out of Scope.)* This section previously specified
+`FR-12`/`FR-12a`–`FR-12f`: auto-closing a ticket to `CLOSED` 48h after an assignee
+comment with no creator reply, via a BullMQ delayed job and a system-only state
+transition (`SM-6`, §7). It required a Redis-backed delayed-job queue, which is not
+part of this implementation, and is dropped from scope rather than deferred.
+`ticket.service.ts`'s `systemCloseTicket()` and the `autoCloseQueue` scheduling calls
+in `comment.service.ts` predate this decision and are now dead code pending cleanup
+(`task.md` Phase 8).
 
 ### 5.6 File Attachment Requirements
 
@@ -263,14 +271,8 @@ IN_PROGRESS  -> CANCELLED
 | SM-3  | `CLOSED` and `CANCELLED` are terminal: no outgoing transitions. |
 | SM-4  | Transition validity is evaluated against the **current persisted status** (read inside the same transaction), not a client-provided current status, to avoid stale/lost-update races. |
 | SM-5  | The status update and the read of current status occur within a single DB transaction to guarantee correctness under concurrent requests. |
-| SM-6  | **System-only auto-close transition.** A privileged transition `{OPEN, IN_PROGRESS} -> CLOSED` exists **exclusively** for the auto-close job (FR-12). It is **not** reachable via `PATCH /api/tickets/:id/status`; user-initiated requests remain bound by SM-1. The transition is recorded with actor = `system`. |
-| SM-7  | Auto-close never applies to terminal tickets (`CLOSED`, `CANCELLED`) and does not fire on `RESOLVED` tickets (those follow the normal `RESOLVED -> CLOSED` path). |
-
-> **State-machine extension notice:** SM-6 is a deliberate extension of the signature
-> state machine to support FR-12 and should be confirmed with the spec owner. The
-> alternatives considered were (a) auto-`RESOLVED` then auto-`CLOSED` through the legal
-> path, and (b) a distinct `AUTO_CLOSED` terminal status. A gated system-only direct
-> close was chosen to keep user-facing rules strict while keeping the enum fixed.
+| SM-6  | *(Removed 2026-07-08 — see §1.2 Out of Scope.)* Previously a system-only `{OPEN, IN_PROGRESS} -> CLOSED` transition exclusively for the now-removed auto-close job. `systemCloseTicket()` in `ticket.service.ts` still implements this and is dead code pending cleanup (`task.md` Phase 8). |
+| SM-7  | *(Removed 2026-07-08 along with SM-6/FR-12 — see §1.2 Out of Scope.)* |
 
 ---
 
@@ -326,10 +328,10 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
 | NFR-5 | **Config via env:** DB URL, Redis URL, default-admin reference, TTLs, port — all environment-driven with `.env.example`. |
 | NFR-6 | **Logging:** structured server-side logs for errors and key mutations; no secrets in logs. |
 | NFR-7 | **Idempotency (optional/stretch):** ticket creation may accept an idempotency key to avoid duplicates on retry. |
-| NFR-8 | **Async notifications:** email sending is queued (TS-8), never on the request path. A failed send is retried with backoff and logged; it never fails or delays the originating API call. |
-| NFR-9 | **Delayed jobs:** the 48h auto-close is a Redis-backed delayed job keyed by ticket; creator replies cancel it, new assignee comments replace it (FR-12a/b/f). |
-| NFR-10 | **Job idempotency & safety:** background jobs (email, auto-close) are idempotent. Retried or duplicate triggers must not send duplicate emails or double-close a ticket; auto-close re-validates state at execution (FR-12c) and is a no-op if conditions no longer hold. |
-| NFR-11 | **Queue degradation:** if Redis/the queue is unavailable, core ticket and comment APIs continue to function. Notifications and pending auto-close scheduling are degraded and logged (consistent with CACHE-7); this is an accepted limitation while Redis is down. |
+| NFR-8 | **Async notifications:** email sending is off the request path (fire-and-forget, direct call, no queue — §5.4). A failed send is logged but **not** retried with backoff; it never fails or delays the originating API call. |
+| NFR-9 | *(Removed 2026-07-08 — see §1.2 Out of Scope.)* Previously specified the 48h auto-close as a Redis-backed delayed job. |
+| NFR-10 | *(Removed 2026-07-08 — see §1.2 Out of Scope.)* Previously specified job idempotency/safety for email + auto-close background jobs. |
+| NFR-11 | **Degradation:** if SMTP is unavailable, the direct email send fails, is logged, and is dropped — core ticket and comment APIs continue to function. |
 | NFR-12 | **Streaming I/O for attachments:** uploads and downloads stream to/from the storage backend; large files are not fully buffered in memory. Size limits (VAL-6) are enforced during upload, not after fully reading the file. |
 | NFR-13 | **Storage abstraction:** the storage backend is accessed behind an interface so local-FS (dev) and S3-compatible (prod) are swappable via config without touching call sites. |
 
@@ -345,8 +347,8 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
 | TEST-4 | Integration test: assignment endpoint is admin-only (`403` for agent) and rejects non-existent target users (FR-7). |
 | TEST-5 | Integration test: backend validation rejects invalid/missing required fields (VAL-2/VAL-3). |
 | TEST-6 | (Stretch) Unit tests for the pure state-machine transition function and validation rules; cache invalidation tests; failure/edge-case tests. |
-| TEST-7 | **Notifications:** with a captured/fake transport, assert new-ticket and comment events enqueue emails to the correct, **de-duplicated** recipient set, and that the comment author is **excluded** (FR-10/FR-11). No real mail is sent. |
-| TEST-8 | **Auto-close:** (a) an assignee comment schedules the close; (b) a creator reply within 48h cancels it; (c) at the deadline with no creator reply the ticket transitions to `CLOSED` via the system transition and the auto-close notification is enqueued; (d) execution-time re-validation (FR-12c) makes a last-moment creator reply prevent the close. The 48h clock is controllable (injectable deadline / fake timer). |
+| TEST-7 | **Notifications:** with a captured/fake transport, assert new-ticket and comment events directly call the mailer with the correct, **de-duplicated** recipient set, and that the comment author is **excluded** (FR-10/FR-11). No real mail is sent. |
+| TEST-8 | *(Removed 2026-07-08 — see §1.2 Out of Scope.)* Previously specified auto-close job tests. |
 | TEST-9 | **Attachments:** upload accepts allowed types within limits and rejects disallowed type / oversize / over-count (VAL-6); download streams the correct bytes and `Content-Type`; a user without parent-ticket access gets `403` on list/download; delete is restricted to uploader/admin (FR-13–FR-16). Uses a local-FS storage backend in tests. |
 
 ---
@@ -367,12 +369,6 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
   confirm if a self-copy is wanted.
 - **"Admin" recipient** = the designated admin (same resolution as FR-1). If multiple
   admins exist, confirm whether all admins or only the designated one are notified.
-- **Auto-close window** resets on each new assignee comment lacking a creator reply, and
-  a creator reply cancels it. "Creator reply" is taken as any creator comment posted
-  after the triggering assignee comment — confirm if a stricter definition is intended.
-- **Auto-close extends the signature state machine** with a system-only `-> CLOSED`
-  transition (SM-6); confirm this is acceptable versus auto-`RESOLVED`→`CLOSED` or an
-  `AUTO_CLOSED` status.
 - **Attachment storage backend** is config-driven: local filesystem (`public/uploads/`, static-served) for dev, S3-compatible for prod. Confirm the prod target (e.g. AWS S3, MinIO).
 - **Attachment MIME allowlist** is fixed to `image/jpeg` and `image/png` — no PDFs or office documents.
 - **Attachment limits** (max file size, max files per request) are env-configured. Suggested defaults: 5 MB/file, 5 files/request.
@@ -395,11 +391,9 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
 - [ ] Redis cache accelerates reads and degrades gracefully when unavailable.
 - [ ] No secrets committed.
 - [ ] State-machine integration tests pass.
-- [ ] New ticket triggers an email to the creator and admin (async, non-blocking).
+- [ ] New ticket triggers an email to the creator and admin (async, non-blocking, direct call — no queue).
 - [ ] New comment triggers an email to all involved parties (creator, assignee, admin), de-duplicated and excluding the comment author.
-- [ ] Notification failures are retried/logged and never fail the originating API call.
-- [ ] An assignee comment with no creator reply within 48h auto-closes the ticket via the system transition; a creator reply within the window prevents it.
-- [ ] Auto-close re-validates ticket state at execution time and notifies involved parties.
+- [ ] Notification failures are logged and never fail the originating API call (no retry — direct call, not queued).
 - [ ] PNG/JPG files can be uploaded to a ticket or comment via ticket/comment mutation endpoints; metadata in Postgres, bytes in storage backend.
 - [ ] Upload rejects non-PNG/JPG MIME types (`415`), oversize files, and over-count requests (`400`).
 - [ ] Attachment metadata (including direct-access `url`) is returned inline in ticket detail and comment list/detail responses.

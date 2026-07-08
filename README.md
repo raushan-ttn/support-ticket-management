@@ -20,7 +20,7 @@ npm run dev
 - File attachments (image/jpeg, image/png only) — multiple files per ticket or per comment; uploaded inline via `multipart/form-data` on ticket create/update and comment creation, no standalone attachment endpoints. Attachment metadata (`id`, `filename`, `mimeType`, `sizeBytes`, `uploadedBy`, `createdAt`, `url`) is embedded in ticket and comment responses; `storageKey` is never exposed. Local filesystem (dev, served via `express.static`) or S3 (prod) storage backend, selected via `STORAGE_BACKEND`
 - JWT-based session management with Passport
 - Redis caching for read-heavy operations, including per-ticket attachment metadata (`ticket:{id}:attachments`)
-- Email notifications via BullMQ job queue
+- Email notifications (planned): direct SMTP/nodemailer send, fire-and-forget, no job queue, for new tickets and comments — see `.claude/plans/notifications-email.md`. Auto-close-on-stale-reply is out of scope (would have required a BullMQ delayed-job queue).
 
 ## Scripts
 

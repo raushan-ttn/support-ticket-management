@@ -410,14 +410,14 @@ Terminal states with no outgoing transitions (SM-3):
 
 Any transition not in the list above — including same-state no-ops (e.g., `OPEN → OPEN`) and any transition out of a terminal state — is rejected with `409 INVALID_STATUS_TRANSITION` (SM-1, SM-2).
 
-**System-only transition (SM-6):**
+**System-only transition (SM-6) — dead code, pending removal (2026-07-08):**
 
 ```
 OPEN        → CLOSED  (auto-close job only)
 IN_PROGRESS → CLOSED  (auto-close job only)
 ```
 
-This transition is implemented in `systemCloseTicket()` in the service and is **not reachable** through `PATCH /api/v1/tickets/:id/status`. It is used exclusively by the auto-close background job (Phase 8 / FR-12). The function re-validates the ticket's current status inside a transaction before applying the close, skipping the close if the ticket has already moved to a terminal or `RESOLVED` state (FR-12c, SM-7).
+This transition is implemented in `systemCloseTicket()` in the service and is **not reachable** through `PATCH /api/v1/tickets/:id/status`. It was built for the auto-close background job (formerly Phase 8 / FR-12), which has since been **removed from scope** — it required a Redis-backed BullMQ delayed-job queue that is not part of this implementation (`requirements.md` §1.2). `systemCloseTicket()` is now unreachable by anything and is tracked for deletion in `task.md` Phase 8.
 
 The state machine definition in the service:
 
@@ -450,11 +450,11 @@ All cache reads and writes are wrapped in `try/catch`. A Redis failure logs the 
 
 ## Background Jobs
 
-The tickets module exposes `systemCloseTicket(id)` as a named export from `ticket.service.ts` for consumption by the auto-close job worker (Phase 8). No BullMQ queues are added by the tickets module itself. Notification jobs (email on ticket create) are a Phase 7 concern; the current implementation does not enqueue them yet.
+The tickets module exposes `systemCloseTicket(id)` as a named export from `ticket.service.ts`. It was written for the auto-close job worker (formerly Phase 8), which has since been **removed from scope** (`requirements.md` §1.2) — no worker ever consumed it, and it is now dead code pending removal (`task.md` Phase 8 cleanup item). Email notifications (Phase 7) are sent via a direct, non-queued call from `ticket.service.createTicket()` / `comment.service.addComment()` — no BullMQ queue is used anywhere in this codebase.
 
 | Function | Used by | Behavior |
 |----------|---------|----------|
-| `systemCloseTicket(id)` | `src/jobs/autoCloseWorker.ts` (Phase 8) | Closes `OPEN` or `IN_PROGRESS` tickets; no-op if already terminal or `RESOLVED`; invalidates cache |
+| `systemCloseTicket(id)` | Nothing (dead code) | Closes `OPEN` or `IN_PROGRESS` tickets; no-op if already terminal or `RESOLVED`; invalidates cache |
 
 ---
 

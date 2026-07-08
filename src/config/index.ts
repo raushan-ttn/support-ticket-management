@@ -19,9 +19,6 @@ interface Config {
     password: string | undefined;
     from: string;
   };
-  queue: {
-    autoCloseDelayMs: number;
-  };
   postgres: {
     host: string;
     port: number;
@@ -114,10 +111,6 @@ const config: Config = {
     user: process.env.SMTP_USER || undefined,
     password: process.env.SMTP_PASSWORD || undefined,
     from: process.env.SMTP_FROM || 'no-reply@support.local',
-  },
-
-  queue: {
-    autoCloseDelayMs: parseInt(process.env.AUTO_CLOSE_DELAY_MS || '172800000', 10), // 48h
   },
 
   storage: {

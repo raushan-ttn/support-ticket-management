@@ -1,6 +1,6 @@
 import { query } from '../../config/postgres';
 import { deleteCache, getCache, setCache } from '../../config/redis';
-import { autoCloseQueue, emailQueue } from '../../jobs/queues';
+import { sendCommentNotificationEmail } from '../../jobs/notifications';
 import { buildStorageKey, getStorageBackend } from '../../storage';
 import { getTicketById } from '../tickets/ticket.service';
 import { addComment, getCommentById, listComments } from './comment.service';
@@ -15,9 +15,8 @@ jest.mock('../../config/redis', () => ({
   deleteCache: jest.fn(),
 }));
 
-jest.mock('../../jobs/queues', () => ({
-  emailQueue: { add: jest.fn() },
-  autoCloseQueue: { add: jest.fn(), getJob: jest.fn() },
+jest.mock('../../jobs/notifications', () => ({
+  sendCommentNotificationEmail: jest.fn(),
 }));
 
 jest.mock('../../storage', () => ({
@@ -39,12 +38,8 @@ const mockQuery = query as jest.MockedFunction<typeof query>;
 const mockGetCache = getCache as jest.MockedFunction<typeof getCache>;
 const mockSetCache = setCache as jest.MockedFunction<typeof setCache>;
 const mockDeleteCache = deleteCache as jest.MockedFunction<typeof deleteCache>;
-const mockEmailQueueAdd = emailQueue.add as jest.MockedFunction<typeof emailQueue.add>;
-const mockAutoCloseQueueAdd = autoCloseQueue.add as jest.MockedFunction<
-  typeof autoCloseQueue.add
->;
-const mockAutoCloseQueueGetJob = autoCloseQueue.getJob as jest.MockedFunction<
-  typeof autoCloseQueue.getJob
+const mockSendCommentNotificationEmail = sendCommentNotificationEmail as jest.MockedFunction<
+  typeof sendCommentNotificationEmail
 >;
 const mockBuildStorageKey = buildStorageKey as jest.MockedFunction<typeof buildStorageKey>;
 const mockGetStorageBackend = getStorageBackend as jest.MockedFunction<typeof getStorageBackend>;
@@ -90,9 +85,7 @@ beforeEach(() => {
   mockGetCache.mockResolvedValue(null);
   mockSetCache.mockResolvedValue(undefined);
   mockDeleteCache.mockResolvedValue(undefined);
-  mockEmailQueueAdd.mockResolvedValue({ id: 'job-1' } as never);
-  mockAutoCloseQueueAdd.mockResolvedValue({ id: 'job-2' } as never);
-  mockAutoCloseQueueGetJob.mockResolvedValue(undefined);
+  mockSendCommentNotificationEmail.mockResolvedValue(undefined);
 });
 
 // ── addComment ─────────────────────────────────────────────────────────────────
@@ -156,66 +149,25 @@ describe('addComment', () => {
     expect(insertCall[1]?.[2]).toBe(storageKey);
   });
 
-  it('schedules auto-close job when assignee comments on non-terminal ticket', async () => {
-    const assigneeTicket = { ...mockTicket, assignedTo: AGENT_ID, status: 'IN_PROGRESS' as const };
-    mockGetTicketById.mockResolvedValue(assigneeTicket);
-
+  it('sends comment-notification email with correct payload', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
 
-    await addComment(TICKET_ID, 'Assignee reply', undefined, undefined, AGENT_ID, 'AGENT');
+    await addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT');
 
-    expect(mockAutoCloseQueueAdd).toHaveBeenCalledWith(
-      'auto-close',
-      expect.objectContaining({ ticketId: TICKET_ID, assigneeId: AGENT_ID }),
-      expect.objectContaining({ jobId: `auto-close:${TICKET_ID}` }),
+    expect(mockSendCommentNotificationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ ticketId: TICKET_ID, commentAuthorId: AGENT_ID }),
     );
   });
 
-  it('cancels pending auto-close job when creator replies', async () => {
-    // assignedTo must differ from callerId so the assignee branch is NOT taken
-    const creatorTicket = {
-      ...mockTicket,
-      createdBy: AGENT_ID,
-      assignedTo: ADMIN_ID, // different from callerId (AGENT_ID)
-      status: 'IN_PROGRESS' as const,
-    };
-    mockGetTicketById.mockResolvedValue(creatorTicket);
-
-    const mockJobRemove = jest.fn().mockResolvedValue(undefined);
-    mockAutoCloseQueueGetJob.mockResolvedValue({ remove: mockJobRemove } as never);
-
+  it('does not re-throw when notification send fails (fire-and-forget)', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
+    mockSendCommentNotificationEmail.mockRejectedValue(new Error('SMTP unavailable'));
 
-    await addComment(TICKET_ID, 'Creator reply', undefined, undefined, AGENT_ID, 'AGENT');
-
-    expect(mockAutoCloseQueueGetJob).toHaveBeenCalledWith(`auto-close:${TICKET_ID}`);
-    expect(mockJobRemove).toHaveBeenCalled();
-  });
-
-  it('does NOT schedule auto-close when ticket is already in terminal status', async () => {
-    const closedTicket = { ...mockTicket, assignedTo: AGENT_ID, status: 'RESOLVED' as const };
-    mockGetTicketById.mockResolvedValue(closedTicket);
-
-    mockQuery
-      .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
-      .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
-
-    await addComment(TICKET_ID, 'Comment on resolved ticket', undefined, undefined, AGENT_ID, 'AGENT');
-
-    expect(mockAutoCloseQueueAdd).not.toHaveBeenCalled();
-  });
-
-  it('does not re-throw when queue add fails (fire-and-forget)', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
-      .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
-    mockEmailQueueAdd.mockRejectedValue(new Error('Redis unavailable'));
-
-    // Should resolve normally despite queue failure
+    // Should resolve normally despite notification failure
     await expect(
       addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT'),
     ).resolves.toMatchObject({ id: COMMENT_ID });

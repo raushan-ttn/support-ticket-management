@@ -1,6 +1,6 @@
 import multer from 'multer';
-import config from '../config';
-import { ALLOWED_ATTACHMENT_MIMES } from '../modules/attachments/attachment.schemas';
+import config from '../../config';
+import { ALLOWED_ATTACHMENT_MIMES } from '../attachments/attachment.schemas';
 
 // Screenshot keeps the broad, config-driven allowlist it always had.
 const SCREENSHOT_ALLOWED_MIMES = new Set(config.attachment.allowedMimeTypes);
