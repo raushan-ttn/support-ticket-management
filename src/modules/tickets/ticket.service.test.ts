@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../../config/postgres';
 import { deleteCache, deleteCacheByPattern, getCache, setCache } from '../../config/redis';
+import { getAttachmentsByTicket } from '../attachments/attachment.service';
 import {
   assignTicket,
   createTicket,
@@ -20,6 +21,11 @@ jest.mock('../../config/redis', () => ({
   deleteCacheByPattern: jest.fn(),
 }));
 
+jest.mock('../attachments/attachment.service', () => ({
+  getAttachmentsByTicket: jest.fn(),
+  uploadAttachments: jest.fn(),
+}));
+
 const mockQuery = query as jest.MockedFunction<typeof query>;
 const mockWithTransaction = withTransaction as jest.MockedFunction<typeof withTransaction>;
 const mockGetCache = getCache as jest.MockedFunction<typeof getCache>;
@@ -27,6 +33,9 @@ const mockSetCache = setCache as jest.MockedFunction<typeof setCache>;
 const mockDeleteCache = deleteCache as jest.MockedFunction<typeof deleteCache>;
 const mockDeleteCacheByPattern = deleteCacheByPattern as jest.MockedFunction<
   typeof deleteCacheByPattern
+>;
+const mockGetAttachmentsByTicket = getAttachmentsByTicket as jest.MockedFunction<
+  typeof getAttachmentsByTicket
 >;
 
 const ADMIN_ID = 'aaaaaaaa-0000-0000-0000-000000000001';
@@ -46,6 +55,7 @@ const mockTicket = {
   createdBy: AGENT_ID,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  attachments: [],
 };
 
 beforeEach(() => {
@@ -54,6 +64,7 @@ beforeEach(() => {
   mockSetCache.mockResolvedValue(undefined);
   mockDeleteCache.mockResolvedValue(undefined);
   mockDeleteCacheByPattern.mockResolvedValue(undefined);
+  mockGetAttachmentsByTicket.mockResolvedValue([]);
 });
 
 // TEST-2: createTicket ignores client status/assignedTo; auto-assigns to admin
@@ -234,10 +245,12 @@ describe('assignTicket', () => {
 // getTicketById — cache + scope
 describe('getTicketById', () => {
   it('returns cached ticket for admin without DB query', async () => {
-    mockGetCache.mockResolvedValueOnce(mockTicket);
+    // Cache stores TicketDbRow (no attachments field); service merges attachments from getAttachmentsByTicket
+    const cachedDbRow = { ...mockTicket, attachments: undefined };
+    mockGetCache.mockResolvedValueOnce(cachedDbRow);
 
     const result = await getTicketById(TICKET_ID, ADMIN_ID, 'ADMIN');
-    expect(result).toEqual(mockTicket);
+    expect(result).toMatchObject({ id: TICKET_ID, title: 'Test Ticket', attachments: [] });
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
@@ -246,10 +259,11 @@ describe('getTicketById', () => {
     mockQuery.mockResolvedValueOnce({ rows: [mockTicket], rowCount: 1 } as never);
 
     const result = await getTicketById(TICKET_ID, ADMIN_ID, 'ADMIN');
-    expect(result).toEqual(mockTicket);
+    expect(result).toMatchObject({ id: TICKET_ID, title: 'Test Ticket', attachments: [] });
+    // Cache stores the DB row shape (without attachments)
     expect(mockSetCache).toHaveBeenCalledWith(
       `ticket:${TICKET_ID}`,
-      mockTicket,
+      expect.objectContaining({ id: TICKET_ID }),
       expect.any(Number),
     );
   });

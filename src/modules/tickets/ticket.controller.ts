@@ -17,7 +17,8 @@ export const create = async (req: Request, res: Response, next: NextFunction): P
   try {
     const user = getUser(req, res);
     if (!user) return;
-    const ticket = await ticketService.createTicket(req.body, user.id);
+    const files = Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : undefined;
+    const ticket = await ticketService.createTicket(req.body, user.id, files);
     success(res, ticket, 201);
   } catch (err) {
     next(err);
@@ -56,7 +57,8 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
     const user = getUser(req, res);
     if (!user) return;
     const id = uuidParam.parse(req.params.id);
-    const ticket = await ticketService.updateTicket(id, req.body, user.id, user.role);
+    const files = Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : undefined;
+    const ticket = await ticketService.updateTicket(id, req.body, user.id, user.role, files);
     success(res, ticket);
   } catch (err) {
     next(err);

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { AttachmentRow } from '../attachments/attachment.schemas';
+
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'CANCELLED';
 
@@ -66,6 +68,7 @@ export interface TicketRow {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  attachments: AttachmentRow[];
 }
 
 export interface TicketListResult {

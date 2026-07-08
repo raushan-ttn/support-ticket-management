@@ -7,6 +7,12 @@ import { autoCloseQueue, emailQueue } from '../../jobs/queues';
 import { buildStorageKey, getStorageBackend } from '../../storage';
 import type { AutoCloseJobData, CommentNotificationJobData } from '../../types/jobs';
 import type { UserRole } from '../auth/auth.schemas';
+import {
+  getAttachmentsByComment,
+  toAttachmentUrl,
+  uploadAttachments,
+} from '../attachments/attachment.service';
+import { AttachmentRow } from '../attachments/attachment.schemas';
 import { getTicketById } from '../tickets/ticket.service';
 import { CommentRow } from './comment.schemas';
 
@@ -30,6 +36,35 @@ function toScreenshotUrl(key: string | null): string | null {
   return `/uploads/${key}`;
 }
 
+// DB-only comment row (no attachments field — not a DB column)
+interface CommentDbRow {
+  id: string;
+  ticketId: string;
+  message: string;
+  screenshot: string | null;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+// Row shape returned by the list query with aggregated attachments JSON
+interface CommentListDbRow extends CommentDbRow {
+  attachmentsJson: AttachmentDbRowJson[] | null;
+}
+
+// JSON shape of each attachment object from json_agg (all keys are snake_case from DB)
+interface AttachmentDbRowJson {
+  id: string;
+  ticket_id: string;
+  comment_id: string | null;
+  filename: string;
+  storage_key: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  created_at: string;
+}
+
 const COMMENT_SELECT = `
   c.id,
   c.ticket_id  AS "ticketId",
@@ -44,6 +79,7 @@ export async function addComment(
   ticketId: string,
   message: string,
   file: Express.Multer.File | undefined,
+  attachmentFiles: Express.Multer.File[] | undefined,
   callerId: string,
   callerRole: UserRole,
 ): Promise<CommentRow> {
@@ -65,9 +101,9 @@ export async function addComment(
     screenshotKey = key;
   }
 
-  let result: { rows: CommentRow[]; rowCount: number | null };
+  let result: { rows: CommentDbRow[]; rowCount: number | null };
   try {
-    result = await query<CommentRow>(
+    result = await query<CommentDbRow>(
       `WITH inserted AS (
          INSERT INTO comments (ticket_id, message, screenshot, created_by)
          VALUES ($1, $2, $3, $4)
@@ -94,7 +130,24 @@ export async function addComment(
     throw createHttpError('Failed to create comment', 500);
   }
 
-  const comment = { ...result.rows[0], screenshot: toScreenshotUrl(result.rows[0].screenshot) };
+  const commentId = result.rows[0].id;
+  const screenshot = toScreenshotUrl(result.rows[0].screenshot);
+
+  // Upload attachment files if provided (fire-and-forget on error)
+  let attachments: AttachmentRow[] = [];
+  if (attachmentFiles && attachmentFiles.length > 0) {
+    try {
+      attachments = await uploadAttachments(ticketId, attachmentFiles, callerId, commentId);
+    } catch (uploadErr) {
+      console.error('[Attachments] Upload error on addComment:', (uploadErr as Error).message);
+    }
+  }
+
+  const comment: CommentRow = {
+    ...result.rows[0],
+    screenshot,
+    attachments,
+  };
 
   try {
     await deleteCache(`ticket:${ticketId}:comments`);
@@ -163,6 +216,20 @@ export async function addComment(
   return comment;
 }
 
+function mapAttachmentJson(a: AttachmentDbRowJson): AttachmentRow {
+  return {
+    id: a.id,
+    ticketId: a.ticket_id,
+    commentId: a.comment_id,
+    filename: a.filename,
+    mimeType: a.mime_type,
+    sizeBytes: a.size_bytes,
+    uploadedBy: a.uploaded_by,
+    createdAt: a.created_at,
+    url: toAttachmentUrl(a.storage_key),
+  };
+}
+
 export async function listComments(
   ticketId: string,
   callerId: string,
@@ -180,16 +247,51 @@ export async function listComments(
     console.error('[Cache] Failed to read comments cache:', (cacheErr as Error).message);
   }
 
-  const result = await query<CommentRow>(
-    `SELECT ${COMMENT_SELECT}
+  // Use LEFT JOIN + json_agg to avoid N+1 queries when fetching per-comment attachments
+  const result = await query<CommentListDbRow>(
+    `SELECT
+       c.id,
+       c.ticket_id  AS "ticketId",
+       c.message,
+       c.screenshot,
+       c.created_by AS "createdBy",
+       u.name       AS "createdByName",
+       c.created_at AS "createdAt",
+       COALESCE(
+         json_agg(
+           json_build_object(
+             'id',          a.id,
+             'ticket_id',   a.ticket_id,
+             'comment_id',  a.comment_id,
+             'filename',    a.filename,
+             'storage_key', a.storage_key,
+             'mime_type',   a.mime_type,
+             'size_bytes',  a.size_bytes,
+             'uploaded_by', a.uploaded_by,
+             'created_at',  a.created_at
+           ) ORDER BY a.created_at ASC
+         ) FILTER (WHERE a.id IS NOT NULL),
+         '[]'
+       ) AS "attachmentsJson"
      FROM comments c
      JOIN users u ON u.id = c.created_by
+     LEFT JOIN attachments a ON a.comment_id = c.id
      WHERE c.ticket_id = $1
+     GROUP BY c.id, u.name
      ORDER BY c.created_at ASC`,
     [ticketId],
   );
 
-  const rows = result.rows.map((row) => ({ ...row, screenshot: toScreenshotUrl(row.screenshot) }));
+  const rows: CommentRow[] = result.rows.map((row) => ({
+    id: row.id,
+    ticketId: row.ticketId,
+    message: row.message,
+    screenshot: toScreenshotUrl(row.screenshot),
+    createdBy: row.createdBy,
+    createdByName: row.createdByName,
+    createdAt: row.createdAt,
+    attachments: (row.attachmentsJson ?? []).map(mapAttachmentJson),
+  }));
 
   try {
     await setCache(cacheKey, rows, config.redis.ttlSeconds);
@@ -209,7 +311,7 @@ export async function getCommentById(
   // Scope gate: throws 404 if ticket not found, 403 if caller out of scope
   await getTicketById(ticketId, callerId, callerRole);
 
-  const result = await query<CommentRow>(
+  const result = await query<CommentDbRow>(
     `SELECT ${COMMENT_SELECT}
      FROM comments c
      JOIN users u ON u.id = c.created_by
@@ -221,5 +323,12 @@ export async function getCommentById(
     throw createHttpError('Comment not found', 404, 'INVALID_COMMENT_REFERENCE');
   }
 
-  return { ...result.rows[0], screenshot: toScreenshotUrl(result.rows[0].screenshot) };
+  const dbRow = result.rows[0];
+  const attachments = await getAttachmentsByComment(commentId);
+
+  return {
+    ...dbRow,
+    screenshot: toScreenshotUrl(dbRow.screenshot),
+    attachments,
+  };
 }

@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 import config from '../../config';
 import { query, withTransaction } from '../../config/postgres';
 import { deleteCache, deleteCacheByPattern, getCache, setCache } from '../../config/redis';
+import { getAttachmentsByTicket, uploadAttachments } from '../attachments/attachment.service';
 import {
   AssignPayload,
   CreateTicketPayload,
@@ -12,6 +13,22 @@ import {
   TicketStatus,
   UpdateTicketPayload,
 } from './ticket.schemas';
+
+// DB-only ticket shape: no attachments field (not a DB column)
+interface TicketDbRow {
+  id: string;
+  title: string;
+  description: string;
+  type: string | null;
+  subType: string | null;
+  screenshot: string | null;
+  priority: string;
+  status: string;
+  assignedTo: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 const SORT_COLUMN_MAP: Record<string, string> = {
   createdAt: 't.created_at',
@@ -65,12 +82,34 @@ const TICKET_RETURNING = `
   updated_at AS "updatedAt"
 `;
 
-async function selectTicketById(client: PoolClient | null, id: string): Promise<TicketRow | null> {
+async function selectTicketById(
+  client: PoolClient | null,
+  id: string,
+): Promise<TicketDbRow | null> {
   const sql = `SELECT ${TICKET_SELECT} FROM tickets t WHERE t.id = $1`;
   const result = client
-    ? await client.query<TicketRow>(sql, [id])
-    : await query<TicketRow>(sql, [id]);
+    ? await client.query<TicketDbRow>(sql, [id])
+    : await query<TicketDbRow>(sql, [id]);
   return result.rows[0] ?? null;
+}
+
+async function withAttachments(dbRow: TicketDbRow): Promise<TicketRow> {
+  const attachments = await getAttachmentsByTicket(dbRow.id);
+  return {
+    id: dbRow.id,
+    title: dbRow.title,
+    description: dbRow.description,
+    type: dbRow.type,
+    subType: dbRow.subType,
+    screenshot: dbRow.screenshot,
+    priority: dbRow.priority as TicketRow['priority'],
+    status: dbRow.status as TicketRow['status'],
+    assignedTo: dbRow.assignedTo,
+    createdBy: dbRow.createdBy,
+    createdAt: dbRow.createdAt,
+    updatedAt: dbRow.updatedAt,
+    attachments,
+  };
 }
 
 async function invalidateTicketCache(id: string): Promise<void> {
@@ -85,6 +124,7 @@ async function invalidateTicketCache(id: string): Promise<void> {
 export async function createTicket(
   payload: CreateTicketPayload,
   creatorId: string,
+  files?: Express.Multer.File[],
 ): Promise<TicketRow> {
   const adminResult = await query<{ id: string }>(
     "SELECT id FROM users WHERE role = 'ADMIN' ORDER BY created_at ASC LIMIT 1",
@@ -111,8 +151,17 @@ export async function createTicket(
   );
   const ticketId = insertResult.rows[0].id;
 
-  const ticket = await selectTicketById(null, ticketId);
-  if (!ticket) throw createHttpError('Failed to retrieve created ticket', 500);
+  const dbRow = await selectTicketById(null, ticketId);
+  if (!dbRow) throw createHttpError('Failed to retrieve created ticket', 500);
+
+  // Upload files if provided (fire-and-forget on error — partial upload acceptable)
+  if (files && files.length > 0) {
+    try {
+      await uploadAttachments(ticketId, files, creatorId);
+    } catch (uploadErr) {
+      console.error('[Attachments] Upload error on createTicket:', (uploadErr as Error).message);
+    }
+  }
 
   try {
     await invalidateTicketCache(ticketId);
@@ -120,7 +169,7 @@ export async function createTicket(
     console.error('[Cache] Post-create invalidation error:', (err as Error).message);
   }
 
-  return ticket;
+  return withAttachments(dbRow);
 }
 
 export async function listTickets(
@@ -176,7 +225,7 @@ export async function listTickets(
   const offset = (page - 1) * limit;
   params.push(limit, offset);
 
-  const ticketsResult = await query<TicketRow>(
+  const ticketsResult = await query<TicketDbRow>(
     `SELECT ${TICKET_SELECT}
      FROM tickets t
      ${whereClause}
@@ -185,7 +234,24 @@ export async function listTickets(
     params,
   );
 
-  return { tickets: ticketsResult.rows, total, page, limit };
+  // List endpoint returns tickets without inline attachments (only GET /:id embeds them)
+  const tickets: TicketRow[] = ticketsResult.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    type: row.type,
+    subType: row.subType,
+    screenshot: row.screenshot,
+    priority: row.priority as TicketRow['priority'],
+    status: row.status as TicketRow['status'],
+    assignedTo: row.assignedTo,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    attachments: [],
+  }));
+
+  return { tickets, total, page, limit };
 }
 
 export async function getTicketById(
@@ -193,8 +259,10 @@ export async function getTicketById(
   callerId: string,
   callerRole: string,
 ): Promise<TicketRow> {
+  let dbRow: TicketDbRow | null = null;
+
   try {
-    const cached = await getCache<TicketRow>(`ticket:${id}`);
+    const cached = await getCache<TicketDbRow>(`ticket:${id}`);
     if (cached) {
       if (
         callerRole === 'AGENT' &&
@@ -203,7 +271,7 @@ export async function getTicketById(
       ) {
         throw createHttpError('Forbidden', 403, 'FORBIDDEN');
       }
-      return cached;
+      dbRow = cached;
     }
   } catch (err) {
     const e = err as Error & { statusCode?: number };
@@ -211,20 +279,24 @@ export async function getTicketById(
     console.error('[Cache] Read error:', e.message);
   }
 
-  const ticket = await selectTicketById(null, id);
-  if (!ticket) throw createHttpError('Ticket not found', 404, 'NOT_FOUND');
+  if (!dbRow) {
+    const found = await selectTicketById(null, id);
+    if (!found) throw createHttpError('Ticket not found', 404, 'NOT_FOUND');
 
-  if (callerRole === 'AGENT' && ticket.assignedTo !== callerId && ticket.createdBy !== callerId) {
-    throw createHttpError('Forbidden', 403, 'FORBIDDEN');
+    if (callerRole === 'AGENT' && found.assignedTo !== callerId && found.createdBy !== callerId) {
+      throw createHttpError('Forbidden', 403, 'FORBIDDEN');
+    }
+
+    try {
+      await setCache(`ticket:${id}`, found, config.redis.ttlSeconds);
+    } catch (err) {
+      console.error('[Cache] Write error:', (err as Error).message);
+    }
+
+    dbRow = found;
   }
 
-  try {
-    await setCache(`ticket:${id}`, ticket, config.redis.ttlSeconds);
-  } catch (err) {
-    console.error('[Cache] Write error:', (err as Error).message);
-  }
-
-  return ticket;
+  return withAttachments(dbRow);
 }
 
 export async function updateTicket(
@@ -232,9 +304,10 @@ export async function updateTicket(
   payload: UpdateTicketPayload,
   callerId: string,
   callerRole: string,
+  files?: Express.Multer.File[],
 ): Promise<TicketRow> {
-  return withTransaction(async (client: PoolClient) => {
-    const lockResult = await client.query<TicketRow>(
+  const dbRow = await withTransaction(async (client: PoolClient) => {
+    const lockResult = await client.query<TicketDbRow>(
       `SELECT ${TICKET_SELECT} FROM tickets t WHERE t.id = $1 FOR UPDATE`,
       [id],
     );
@@ -281,7 +354,7 @@ export async function updateTicket(
       throw createHttpError('At least one field required', 400, 'VALIDATION_ERROR');
 
     params.push(id);
-    const updateResult = await client.query<TicketRow>(
+    const updateResult = await client.query<TicketDbRow>(
       `UPDATE tickets SET ${setClauses.join(', ')} WHERE id = $${params.length}
        RETURNING ${TICKET_RETURNING}`,
       params,
@@ -294,6 +367,17 @@ export async function updateTicket(
 
     return updateResult.rows[0];
   });
+
+  // Upload files if provided (after transaction commits)
+  if (files && files.length > 0) {
+    try {
+      await uploadAttachments(id, files, callerId);
+    } catch (uploadErr) {
+      console.error('[Attachments] Upload error on updateTicket:', (uploadErr as Error).message);
+    }
+  }
+
+  return withAttachments(dbRow);
 }
 
 export async function transitionStatus(
@@ -302,7 +386,7 @@ export async function transitionStatus(
   callerId: string,
   callerRole: string,
 ): Promise<TicketRow> {
-  return withTransaction(async (client: PoolClient) => {
+  const dbRow = await withTransaction(async (client: PoolClient) => {
     const lockResult = await client.query<{ status: TicketStatus; assigned_to: string }>(
       'SELECT status, assigned_to FROM tickets WHERE id = $1 FOR UPDATE',
       [id],
@@ -328,16 +412,19 @@ export async function transitionStatus(
 
     await client.query('UPDATE tickets SET status = $1 WHERE id = $2', [newStatus, id]);
 
-    const ticketResult = await client.query<TicketRow>(
+    const ticketResult = await client.query<TicketDbRow>(
       `SELECT ${TICKET_SELECT} FROM tickets t WHERE t.id = $1`,
       [id],
     );
     const updated = ticketResult.rows[0];
+    if (!updated) throw createHttpError('Failed to retrieve ticket after status transition', 500);
 
     await invalidateTicketCache(id);
 
     return updated;
   });
+
+  return withAttachments(dbRow);
 }
 
 export async function assignTicket(ticketId: string, payload: AssignPayload): Promise<TicketRow> {
@@ -359,12 +446,12 @@ export async function assignTicket(ticketId: string, payload: AssignPayload): Pr
 
   await query('UPDATE tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticketId]);
 
-  const ticket = await selectTicketById(null, ticketId);
-  if (!ticket) throw createHttpError('Failed to retrieve ticket after assign', 500);
+  const dbRow = await selectTicketById(null, ticketId);
+  if (!dbRow) throw createHttpError('Failed to retrieve ticket after assign', 500);
 
   await invalidateTicketCache(ticketId);
 
-  return ticket;
+  return withAttachments(dbRow);
 }
 
 export async function systemCloseTicket(id: string): Promise<void> {
