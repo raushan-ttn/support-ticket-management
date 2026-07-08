@@ -27,6 +27,12 @@ jest.mock('../../storage', () => ({
 
 jest.mock('../tickets/ticket.service', () => ({ getTicketById: jest.fn() }));
 
+jest.mock('../attachments/attachment.service', () => ({
+  uploadAttachments: jest.fn().mockResolvedValue([]),
+  getAttachmentsByComment: jest.fn().mockResolvedValue([]),
+  toAttachmentUrl: jest.fn((key: string) => `/${key}`),
+}));
+
 // ── Typed mock refs ────────────────────────────────────────────────────────────
 
 const mockQuery = query as jest.MockedFunction<typeof query>;
@@ -64,6 +70,7 @@ const mockTicket = {
   createdBy: ADMIN_ID,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  attachments: [],
 };
 
 const mockCommentRow = {
@@ -74,6 +81,7 @@ const mockCommentRow = {
   createdBy: AGENT_ID,
   createdByName: 'Agent User',
   createdAt: new Date().toISOString(),
+  attachments: [],
 };
 
 beforeEach(() => {
@@ -96,7 +104,7 @@ describe('addComment', () => {
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never) // CTE insert+select
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never); // admin lookup
 
-    const result = await addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT');
+    const result = await addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT');
 
     expect(result).toMatchObject({ id: COMMENT_ID, message: 'This is a comment' });
     expect(mockDeleteCache).toHaveBeenCalledWith(`ticket:${TICKET_ID}:comments`);
@@ -110,7 +118,7 @@ describe('addComment', () => {
     } as Express.Multer.File;
 
     await expect(
-      addComment(TICKET_ID, 'hello', badFile, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'hello', badFile, undefined, AGENT_ID, 'AGENT'),
     ).rejects.toMatchObject({ statusCode: 415, code: 'UNSUPPORTED_MEDIA_TYPE' });
   });
 
@@ -135,12 +143,14 @@ describe('addComment', () => {
       TICKET_ID,
       'Comment with screenshot',
       fileWithScreenshot,
+      undefined,
       AGENT_ID,
       'AGENT',
     );
 
     expect(mockSave).toHaveBeenCalledWith(storageKey, expect.anything(), 'image/jpeg', 9);
-    expect(result.screenshot).toBe(storageKey);
+    // screenshot URL is the public URL derived from storage key (not the raw key)
+    expect(result.screenshot).toContain(storageKey);
     // Verify storage key is passed to DB insert as $3
     const insertCall = mockQuery.mock.calls[0];
     expect(insertCall[1]?.[2]).toBe(storageKey);
@@ -154,7 +164,7 @@ describe('addComment', () => {
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
 
-    await addComment(TICKET_ID, 'Assignee reply', undefined, AGENT_ID, 'AGENT');
+    await addComment(TICKET_ID, 'Assignee reply', undefined, undefined, AGENT_ID, 'AGENT');
 
     expect(mockAutoCloseQueueAdd).toHaveBeenCalledWith(
       'auto-close',
@@ -180,7 +190,7 @@ describe('addComment', () => {
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
 
-    await addComment(TICKET_ID, 'Creator reply', undefined, AGENT_ID, 'AGENT');
+    await addComment(TICKET_ID, 'Creator reply', undefined, undefined, AGENT_ID, 'AGENT');
 
     expect(mockAutoCloseQueueGetJob).toHaveBeenCalledWith(`auto-close:${TICKET_ID}`);
     expect(mockJobRemove).toHaveBeenCalled();
@@ -194,7 +204,7 @@ describe('addComment', () => {
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
 
-    await addComment(TICKET_ID, 'Comment on resolved ticket', undefined, AGENT_ID, 'AGENT');
+    await addComment(TICKET_ID, 'Comment on resolved ticket', undefined, undefined, AGENT_ID, 'AGENT');
 
     expect(mockAutoCloseQueueAdd).not.toHaveBeenCalled();
   });
@@ -207,7 +217,7 @@ describe('addComment', () => {
 
     // Should resolve normally despite queue failure
     await expect(
-      addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT'),
     ).resolves.toMatchObject({ id: COMMENT_ID });
   });
 
@@ -215,7 +225,7 @@ describe('addComment', () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
 
     await expect(
-      addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT'),
     ).rejects.toMatchObject({ statusCode: 500 });
   });
 
@@ -224,7 +234,7 @@ describe('addComment', () => {
     mockGetTicketById.mockRejectedValue(forbidden);
 
     await expect(
-      addComment(TICKET_ID, 'hello', undefined, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'hello', undefined, undefined, AGENT_ID, 'AGENT'),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 });

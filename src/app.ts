@@ -20,6 +20,9 @@ app.use(helmet());
 app.use(cors({ origin: config.cors.origin, credentials: true }));
 app.use(compression());
 app.use(morgan('dev'));
+// Serve locally stored files (screenshots, attachments) for dev/test environments.
+// S3 URLs are direct S3 object URLs so this middleware is a no-op in production.
+app.use(express.static(config.storage.localDir));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());

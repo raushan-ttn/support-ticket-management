@@ -98,6 +98,60 @@ describe('POST /api/v1/tickets', () => {
 
     expect(res.status).toBe(400);
   });
+
+  // TEST-9: ticket-level attachments on create
+  it('accepts image/png and image/jpeg files on create and returns attachments with url, no storageKey', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+
+    const res = await request(app)
+      .post('/api/v1/tickets')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('title', 'Ticket with files')
+      .field('description', 'has attachments')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' })
+      .attach('files', Buffer.from('fake jpg bytes'), { filename: 'b.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.attachments).toHaveLength(2);
+    for (const attachment of res.body.data.attachments) {
+      expect(attachment).not.toHaveProperty('storageKey');
+      expect(typeof attachment.url).toBe('string');
+    }
+  });
+
+  it('rejects an attachment with a disallowed MIME type on create with 415', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+
+    const res = await request(app)
+      .post('/api/v1/tickets')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('title', 'Ticket with bad file')
+      .field('description', 'bad attachment')
+      .attach('files', Buffer.from('fake pdf'), { filename: 'doc.pdf', contentType: 'application/pdf' });
+
+    expect(res.status).toBe(415);
+  });
+
+  it('rejects more files than the configured per-request limit with 400', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+
+    let req = request(app)
+      .post('/api/v1/tickets')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('title', 'Too many files')
+      .field('description', 'over count');
+
+    for (let i = 0; i < config.attachment.maxFilesPerRequest + 1; i++) {
+      req = req.attach('files', Buffer.from('fake png bytes'), {
+        filename: `f${i}.png`,
+        contentType: 'image/png',
+      });
+    }
+
+    const res = await req;
+
+    expect(res.status).toBe(400);
+  });
 });
 
 // TEST-3: RBAC scoping — admin sees all, agent sees only own
@@ -218,6 +272,52 @@ describe('GET /api/v1/tickets/:id', () => {
       .set('Authorization', `Bearer ${admin.token}`);
 
     expect(res.status).toBe(400);
+  });
+
+  // TEST-9: ticket detail embeds the full attachments array
+  it('embeds attachments array on ticket detail, with no storageKey leaked', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+
+    const createRes = await request(app)
+      .post('/api/v1/tickets')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('title', 'Ticket with files')
+      .field('description', 'has attachments')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' });
+
+    const ticketId: string = createRes.body.data.id;
+
+    const res = await request(app)
+      .get(`/api/v1/tickets/${ticketId}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.attachments).toHaveLength(1);
+    expect(res.body.data.attachments[0]).not.toHaveProperty('storageKey');
+    expect(typeof res.body.data.attachments[0].url).toBe('string');
+  });
+
+  it('returns 403 for out-of-scope agent even when the ticket has attachments', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+    const agent1 = await createUser('Agent1', 'agent1@test.com', 'Agent@123', 'AGENT');
+    const agent2 = await createUser('Agent2', 'agent2@test.com', 'Agent@123', 'AGENT');
+
+    void admin;
+
+    const createRes = await request(app)
+      .post('/api/v1/tickets')
+      .set('Authorization', `Bearer ${agent1.token}`)
+      .field('title', 'Ticket with files')
+      .field('description', 'has attachments')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' });
+
+    const ticketId: string = createRes.body.data.id;
+
+    const res = await request(app)
+      .get(`/api/v1/tickets/${ticketId}`)
+      .set('Authorization', `Bearer ${agent2.token}`);
+
+    expect(res.status).toBe(403);
   });
 });
 
@@ -374,5 +474,32 @@ describe('PATCH /api/v1/tickets/:id', () => {
       .send({});
 
     expect(res.status).toBe(400);
+  });
+
+  // TEST-9: additional ticket-level attachments via update
+  it('accumulates attachments across create and update calls', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+
+    const createRes = await request(app)
+      .post('/api/v1/tickets')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('title', 'Ticket with files')
+      .field('description', 'has attachments')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' });
+
+    const ticketId: string = createRes.body.data.id;
+
+    await request(app)
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('priority', 'HIGH')
+      .attach('files', Buffer.from('fake jpg bytes'), { filename: 'b.jpg', contentType: 'image/jpeg' });
+
+    const res = await request(app)
+      .get(`/api/v1/tickets/${ticketId}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.attachments).toHaveLength(2);
   });
 });

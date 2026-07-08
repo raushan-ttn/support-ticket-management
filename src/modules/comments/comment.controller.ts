@@ -18,10 +18,17 @@ export const add = async (req: Request, res: Response, next: NextFunction): Prom
     const user = getUser(req, res);
     if (!user) return;
     const ticketId = uuidParam.parse(req.params.ticketId);
+    // uploadCommentFiles uses multer .fields(), so req.files is { screenshot?: [...], files?: [...] }
+    const fields = req.files as
+      | Record<'screenshot' | 'files', Express.Multer.File[] | undefined>
+      | undefined;
+    const screenshotFile = fields?.screenshot?.[0];
+    const attachmentFiles = fields?.files;
     const comment = await commentService.addComment(
       ticketId,
       (req.body as CreateCommentPayload).message,
-      req.file,
+      screenshotFile,
+      attachmentFiles,
       user.id,
       user.role,
     );

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { AttachmentRow } from '../attachments/attachment.schemas';
+
 // Screenshot is a multer file field (req.file), not a Zod field.
 export const createCommentSchema = z
   .object({
@@ -17,4 +19,5 @@ export interface CommentRow {
   createdBy: string;
   createdByName: string;
   createdAt: string;
+  attachments: AttachmentRow[];
 }

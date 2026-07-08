@@ -1,18 +1,19 @@
 import { Router } from 'express';
 
 import authenticate from '../../middlewares/authenticate';
-import { upload } from '../../middlewares/upload';
+import { uploadCommentFiles } from '../../middlewares/uploadCommentFiles';
 import { validateBody } from '../../middlewares/validateBody';
 import * as controller from './comment.controller';
 import { createCommentSchema } from './comment.schemas';
 
 const router = Router();
 
-// multer runs before validateBody so req.file is set and req.body.message is populated
+// uploadCommentFiles must run before validateBody so req.files and multipart req.body
+// fields are available. It parses both the 'screenshot' and 'files' fields in one pass.
 router.post(
   '/:ticketId/comments',
   authenticate,
-  upload.single('screenshot'),
+  uploadCommentFiles,
   validateBody(createCommentSchema),
   controller.add,
 );

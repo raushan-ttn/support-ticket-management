@@ -112,23 +112,24 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 6 — Storage Abstraction & Attachments
 
 - [x] **Packages:** `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `sanitize-filename`, `mime-types`, `@types/sanitize-filename`, `@types/mime-types` — TS-9, FR-13c
-- [x] `src/storage/index.ts` — `IStorageBackend` interface (`save`, `delete`); `save` returns `{ storageKey, url }`; factory selects backend from `STORAGE_BACKEND` env — NFR-13
-- [x] `src/storage/local.ts` — saves to `public/uploads/YYYY-MM-DD/{uuid}{ext}`; returns static-served path `/uploads/YYYY-MM-DD/{uuid}{ext}` as `url` — TS-9
+- [x] `src/storage/index.ts` — `StorageBackend` interface (`save(key, stream, mimeType, sizeBytes): Promise<void>`, `getStream`, `delete`); `buildStorageKey()` returns `YYYY-MM-DD/{uuid}`; factory (`getStorageBackend()`) selects backend from `STORAGE_BACKEND` env. `url` is not returned by the backend — it is derived in `attachment.service.ts`'s `toAttachmentUrl()` from the stored key — NFR-13
+- [x] `src/storage/local.ts` — saves to `{STORAGE_LOCAL_DIR}/{key}` (`STORAGE_LOCAL_DIR` defaults to `public`); served at `/{key}` via `express.static(config.storage.localDir)` — TS-9
 - [x] `src/storage/s3.ts` — S3-compatible implementation (prod); returns S3 object URL as `url` — TS-9
-- [ ] Mount `public/` as static in `src/app.ts` via `express.static('public')` for local dev file serving — TS-9
-- [ ] `src/modules/attachments/attachment.schemas.ts`
-  - [ ] `AttachmentRow` response interface: `{ id, filename, mimeType, sizeBytes, uploadedBy, createdAt, commentId, url }` — no `storageKey` in response — §3.4, FR-14
-- [ ] `src/modules/attachments/attachment.service.ts`
-  - [ ] `uploadAttachments(ticketId, files, uploadedBy, commentId?)` — accepts array of files (multiple per call); verify ticket (404) + scope (403); validate each file: MIME (`image/jpeg`/`image/png` only → 415), size + total count (VAL-6 → 400); sanitize filename; UUID storage key per file; save via storage backend; persist one metadata row per file; return `AttachmentRow[]` with `url` — FR-13, FR-13a/b/c
-  - [ ] Validate `commentId` belongs to same `ticketId` when provided — DM-10
-  - [ ] `getAttachmentsByTicket(ticketId)` — returns all `AttachmentRow[]` for the ticket (multiple rows possible); cache as `ticket:{id}:attachments`; invalidate on new upload — CACHE-9, FR-14
-  - [ ] `getAttachmentsByComment(commentId)` — returns all `AttachmentRow[]` for a single comment (multiple rows possible) — FR-14
-- [ ] Extend `ticket.service.getTicketById()` to include inline `attachments: AttachmentRow[]` in response — FR-14
-- [ ] Extend `comment.service.listComments()` and `getCommentById()` to include inline `attachments: AttachmentRow[]` per comment — FR-14
-- [ ] Extend `POST /api/v1/tickets` to accept optional PNG/JPG files via `upload.array('files', maxCount)` multer; call `uploadAttachments()` after ticket insert — FR-13
-- [ ] Extend `PATCH /api/v1/tickets/:id` to accept optional PNG/JPG files via `upload.array('files', maxCount)` multer; call `uploadAttachments()` on new files — FR-13
-- [ ] Extend `POST /api/v1/tickets/:id/comments` to accept optional PNG/JPG files via `upload.array('files', maxCount)` multer alongside existing `screenshot` field; call `uploadAttachments()` with `commentId` — FR-13
-- [ ] **No separate attachment endpoints** — no `/api/v1/attachments/*` routes; upload is part of ticket/comment mutation endpoints; access is through ticket/comment response bodies only
+- [x] Mount `public/` as static in `src/app.ts` via `express.static(config.storage.localDir)` for local dev file serving — TS-9
+- [x] `src/modules/attachments/attachment.schemas.ts`
+  - [x] `AttachmentRow` response interface: `{ id, ticketId, commentId, filename, mimeType, sizeBytes, uploadedBy, createdAt, url }` — no `storageKey` in response — §3.4, FR-14
+- [x] `src/modules/attachments/attachment.service.ts`
+  - [x] `uploadAttachments(ticketId, files, uploadedBy, commentId?)` — accepts array of files (multiple per call); ticket existence/scope verified by callers before invocation; validates each file: MIME (`image/jpeg`/`image/png` only → 415); size + count enforced at the `uploadAttachments` multer middleware (stream-level, VAL-6 → 400); sanitizes filename; UUID storage key per file (`buildStorageKey()`); saves via storage backend; persists one metadata row per file; returns `AttachmentRow[]` with derived `url` — FR-13, FR-13a/b/c
+  - [x] Validates `commentId` belongs to same `ticketId` when provided (400 `INVALID_COMMENT_REFERENCE`) — DM-10
+  - [x] `getAttachmentsByTicket(ticketId)` — returns all `AttachmentRow[]` for the ticket; cached as `ticket:{id}:attachments`; invalidated on new upload — CACHE-9, FR-14
+  - [x] `getAttachmentsByComment(commentId)` — returns all `AttachmentRow[]` for a single comment — FR-14
+- [x] Extend `ticket.service.getTicketById()` (and `createTicket`/`updateTicket`/`transitionStatus`/`assignTicket`) to include inline `attachments: AttachmentRow[]` in response — FR-14
+- [x] Extend `comment.service.listComments()` (LEFT JOIN + `json_agg`, avoids N+1) and `getCommentById()` to include inline `attachments: AttachmentRow[]` per comment — FR-14
+- [x] Extend `POST /api/v1/tickets` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer; call `uploadAttachments()` after ticket insert — FR-13
+- [x] Extend `PATCH /api/v1/tickets/:id` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer; call `uploadAttachments()` on new files — FR-13
+- [x] Extend `POST /api/v1/tickets/:id/comments` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer alongside existing `screenshot` field; call `uploadAttachments()` with `commentId` — FR-13
+- [x] **No separate attachment endpoints** — no `/api/v1/attachments/*` routes; upload is part of ticket/comment mutation endpoints; access is through ticket/comment response bodies only
+- [x] Unit tests (`attachment.service.test.ts`) and TEST-9 integration coverage added to `ticket.controller.test.ts` / `comment.controller.test.ts` (upload success, disallowed MIME → 415, over-count → 400, inline attachments on GET, 403 for out-of-scope agent). Integration suites require a live Postgres/Redis to execute — not runnable in this sandbox (no Docker daemon); verified via `tsc --noEmit` and unit-test runs instead — TEST-9
 
 ---
 

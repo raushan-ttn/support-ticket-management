@@ -147,6 +147,61 @@ describe('POST /api/v1/tickets/:ticketId/comments', () => {
 
     expect(res.status).toBe(415);
   });
+
+  // TEST-9: comment-level attachments
+  it('accepts image/png and image/jpeg files as attachments and returns them with a url, no storageKey', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'ADMIN');
+    const ticket = await createTicketInDb(admin.token, admin.id);
+
+    const res = await request(app)
+      .post(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('message', 'with attachments')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' })
+      .attach('files', Buffer.from('fake jpg bytes'), { filename: 'b.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.attachments).toHaveLength(2);
+    for (const attachment of res.body.data.attachments) {
+      expect(attachment).not.toHaveProperty('storageKey');
+      expect(typeof attachment.url).toBe('string');
+      expect(attachment.commentId).toBe(res.body.data.id);
+    }
+  });
+
+  it('rejects an attachment with a disallowed MIME type via the files field with 415', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'ADMIN');
+    const ticket = await createTicketInDb(admin.token, admin.id);
+
+    const res = await request(app)
+      .post(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('message', 'bad attachment')
+      .attach('files', Buffer.from('fake pdf'), { filename: 'doc.pdf', contentType: 'application/pdf' });
+
+    expect(res.status).toBe(415);
+  });
+
+  it('rejects more attachment files than the configured per-request limit with 400', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'ADMIN');
+    const ticket = await createTicketInDb(admin.token, admin.id);
+
+    let req = request(app)
+      .post(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('message', 'too many files');
+
+    for (let i = 0; i < config.attachment.maxFilesPerRequest + 1; i++) {
+      req = req.attach('files', Buffer.from('fake png bytes'), {
+        filename: `f${i}.png`,
+        contentType: 'image/png',
+      });
+    }
+
+    const res = await req;
+
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── GET /:ticketId/comments ───────────────────────────────────────────────────
@@ -213,6 +268,32 @@ describe('GET /api/v1/tickets/:ticketId/comments', () => {
 
     expect(res.status).toBe(403);
   });
+
+  // TEST-9: each comment embeds its own attachments array, with no cross-comment leakage
+  it('embeds a per-comment attachments array with no cross-comment leakage', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'ADMIN');
+    const ticket = await createTicketInDb(admin.token, admin.id);
+
+    await request(app)
+      .post(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('message', 'no attachment');
+
+    await request(app)
+      .post(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('message', 'has attachment')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' });
+
+    const res = await request(app)
+      .get(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].attachments).toEqual([]);
+    expect(res.body.data[1].attachments).toHaveLength(1);
+    expect(res.body.data[1].attachments[0]).not.toHaveProperty('storageKey');
+  });
 });
 
 // ── GET /:ticketId/comments/:commentId ────────────────────────────────────────
@@ -272,5 +353,27 @@ describe('GET /api/v1/tickets/:ticketId/comments/:commentId', () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  // TEST-9: single comment fetch embeds its attachments array
+  it('embeds attachments array on a single comment fetch', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'ADMIN');
+    const ticket = await createTicketInDb(admin.token, admin.id);
+
+    const addRes = await request(app)
+      .post(`/api/v1/tickets/${ticket.id}/comments`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .field('message', 'with attachment')
+      .attach('files', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' });
+
+    const commentId = addRes.body.data.id as string;
+
+    const res = await request(app)
+      .get(`/api/v1/tickets/${ticket.id}/comments/${commentId}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.attachments).toHaveLength(1);
+    expect(res.body.data.attachments[0]).not.toHaveProperty('storageKey');
   });
 });
