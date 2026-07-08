@@ -143,3 +143,31 @@ This is a planning/documentation change only — no source files were modified i
 None yet (docs/plans only). The pending code cleanup will remove `bullmq` as a dependency and delete `src/config/queue.ts`, `src/jobs/queues.ts`, and `AutoCloseJobData`.
 
 ---
+
+## 2026-07-08 — Swagger/OpenAPI Integration
+
+**Branch:** main
+**Requirements:** None (documentation/tooling)
+
+### What was built
+Added interactive API documentation via Swagger UI and OpenAPI 3.0.3 spec generation. JSDoc `@openapi` blocks documenting all existing API routes are scanned at startup by `swagger-jsdoc` and combined into a complete OpenAPI schema. Swagger UI is served at `GET /api-docs` for interactive endpoint exploration, and the raw OpenAPI JSON is available at `GET /api-docs.json` for client SDKs and tooling. The schema defines 9 documented paths (auth login/me, ticket CRUD and assignment, comment CRUD), 6 reusable component schemas (ErrorResponse, AuthUser, TicketRow, TicketListResult, CommentRow, AttachmentRow), JWT bearer-token security scheme, and shared error response definitions (Unauthorized, Forbidden, NotFound, ValidationError).
+
+### Files added / modified
+- `src/config/swagger.ts` (new) — `swagger-jsdoc` configuration; OpenAPI 3.0.3 definition with reusable schemas and security schemes; globs `src/app.ts` and `src/modules/**/*.routes.ts` for JSDoc `@openapi` blocks
+- `src/app.ts` — Added `@openapi` JSDoc block for `GET /health`; mounted Swagger UI at `/api-docs` and raw spec at `/api-docs.json`
+- `src/modules/auth/auth.routes.ts` — Added `@openapi` JSDoc blocks for `POST /api/v1/auth/login` and `GET /api/v1/auth/me`
+- `src/modules/tickets/ticket.routes.ts` — Added `@openapi` JSDoc blocks for all 6 ticket endpoints (POST create, GET list, GET by ID, PATCH update, PATCH status transition, POST assign)
+- `src/modules/comments/comment.routes.ts` — Added `@openapi` JSDoc blocks for all 3 comment endpoints (POST add, GET list, GET by ID); documented multipart/form-data file upload for screenshot/attachments
+- `package.json` — Added `swagger-jsdoc` (^6.3.0) and `swagger-ui-express` (^5.0.1) as runtime dependencies; `@types/swagger-jsdoc` (^6.0.4) and `@types/swagger-ui-express` (^4.1.8) as devDependencies
+
+### New API endpoints
+- `GET /api-docs` — Swagger UI interface for interactive API documentation
+- `GET /api-docs.json` — Raw OpenAPI 3.0.3 JSON schema
+
+### New environment variables
+None
+
+### Breaking changes
+None
+
+---

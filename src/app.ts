@@ -5,9 +5,11 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import swaggerUi from 'swagger-ui-express';
 
 import config from './config';
 import passport from './config/passport';
+import swaggerSpec from './config/swagger';
 import errorHandler from './middlewares/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
 import commentsRouter from './modules/comments/comment.routes';
@@ -28,6 +30,31 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Service liveness check
+ *     security: []
+ *     servers:
+ *       - url: /
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status: { type: string, example: ok }
+ *                     uptime: { type: number, example: 123.45 }
+ *                     timestamp: { type: string, format: date-time }
+ */
 app.get('/health', (_req, res) =>
   success(res, { status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() }),
 );
@@ -39,6 +66,9 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
 });
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/tickets', ticketRoutes);

@@ -38,6 +38,10 @@ npm run dev
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:coverage` | Generate coverage report |
 
+## API Documentation
+
+Interactive API documentation is available via **Swagger UI** at `GET /api-docs` after starting the server. The raw OpenAPI 3.0.3 schema is served at `GET /api-docs.json` for client SDK generation and integrations.
+
 ## API Overview
 
 <!-- endpoint table maintained by docs-updater -->
