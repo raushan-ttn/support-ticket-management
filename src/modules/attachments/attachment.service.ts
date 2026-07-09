@@ -5,7 +5,8 @@ import sanitizeFilename from 'sanitize-filename';
 import config from '../../config';
 import { query } from '../../config/postgres';
 import { deleteCache, getCache, setCache } from '../../config/redis';
-import { buildStorageKey, getStorageBackend } from '../../storage';
+import { getStorageBackend, buildStorageKey } from '../../storage';
+import { getTicketById } from '../tickets/ticket.service';
 import { ALLOWED_ATTACHMENT_MIMES, AttachmentDbRow, AttachmentRow } from './attachment.schemas';
 
 function createHttpError(message: string, statusCode: number, code?: string): Error {
@@ -171,6 +172,107 @@ export async function getAttachmentsByTicket(ticketId: string): Promise<Attachme
   }
 
   return rows;
+}
+
+export interface DownloadResult {
+  stream: Readable;
+  mimeType: string;
+  filename: string;
+}
+
+/**
+ * Return a readable stream for an attachment file, after verifying ticket access.
+ * Throws 404 if the attachment is not found.
+ * Throws 403/404 if the caller cannot access the parent ticket.
+ */
+export async function downloadAttachment(
+  id: string,
+  callerId: string,
+  callerRole: string,
+): Promise<DownloadResult> {
+  const result = await query<
+    Pick<AttachmentDbRow, 'id' | 'ticketId' | 'storageKey' | 'mimeType' | 'filename'>
+  >(
+    `SELECT
+       id,
+       ticket_id   AS "ticketId",
+       storage_key AS "storageKey",
+       mime_type   AS "mimeType",
+       filename
+     FROM attachments
+     WHERE id = $1`,
+    [id],
+  );
+
+  const row = result.rows[0];
+  if (!row) throw createHttpError('Attachment not found', 404, 'NOT_FOUND');
+
+  // Verify the caller can access the parent ticket — propagates 403/404 on failure
+  await getTicketById(row.ticketId, callerId, callerRole);
+
+  const backend = await getStorageBackend();
+  const stream = await backend.getStream(row.storageKey);
+  return { stream, mimeType: row.mimeType, filename: row.filename };
+}
+
+/**
+ * Delete an attachment from storage and the DB, after verifying ownership.
+ * ADMIN can delete any attachment; AGENT can only delete their own uploads.
+ * Throws 404 if the attachment is not found.
+ * Throws 403 if the agent is not the uploader.
+ * Throws 403/404 if the caller cannot access the parent ticket.
+ */
+export async function deleteAttachment(
+  id: string,
+  callerId: string,
+  callerRole: string,
+): Promise<void> {
+  const result = await query<
+    Pick<AttachmentDbRow, 'id' | 'ticketId' | 'storageKey'> & { uploadedBy: string }
+  >(
+    `SELECT
+       id,
+       ticket_id   AS "ticketId",
+       storage_key AS "storageKey",
+       uploaded_by AS "uploadedBy"
+     FROM attachments
+     WHERE id = $1`,
+    [id],
+  );
+
+  const row = result.rows[0];
+  if (!row) throw createHttpError('Attachment not found', 404, 'NOT_FOUND');
+
+  // Verify the caller can access the parent ticket
+  await getTicketById(row.ticketId, callerId, callerRole);
+
+  // Authorization: AGENT can only delete their own uploads
+  if (callerRole !== 'ADMIN' && row.uploadedBy !== callerId) {
+    throw createHttpError('Forbidden', 403, 'FORBIDDEN');
+  }
+
+  // Delete the DB row first (source of truth) so a storage failure never leaves
+  // a dangling metadata row that still resolves via download.
+  const deleteResult = await query('DELETE FROM attachments WHERE id = $1', [id]);
+  if (!deleteResult.rowCount || deleteResult.rowCount === 0) {
+    throw createHttpError('Attachment not found', 404, 'NOT_FOUND');
+  }
+
+  // Delete from storage (best-effort: log failure but continue — an orphaned
+  // storage blob is preferable to a DB row pointing at a deleted file)
+  const backend = await getStorageBackend();
+  try {
+    await backend.delete(row.storageKey);
+  } catch (storageErr) {
+    console.error('[Storage] Failed to delete file on attachment delete:', (storageErr as Error).message);
+  }
+
+  // Invalidate cache
+  try {
+    await deleteCache(`ticket:${row.ticketId}:attachments`);
+  } catch (cacheErr) {
+    console.error('[Cache] Failed to invalidate attachments cache on delete:', (cacheErr as Error).message);
+  }
 }
 
 /**

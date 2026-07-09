@@ -44,10 +44,20 @@ const VALID_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   CANCELLED: [],
 };
 
-function createHttpError(message: string, statusCode: number, code?: string): Error {
-  const err = new Error(message) as Error & { statusCode: number; code?: string };
+function createHttpError(
+  message: string,
+  statusCode: number,
+  code?: string,
+  extra?: Record<string, unknown>,
+): Error {
+  const err = new Error(message) as Error & {
+    statusCode: number;
+    code?: string;
+    extra?: Record<string, unknown>;
+  };
   err.statusCode = statusCode;
   if (code !== undefined) err.code = code;
+  if (extra !== undefined) err.extra = extra;
   return err;
 }
 
@@ -395,6 +405,7 @@ export async function transitionStatus(
         `Invalid status transition from ${currentStatus} to ${newStatus}`,
         409,
         'INVALID_STATUS_TRANSITION',
+        { from: currentStatus, to: newStatus },
       );
     }
 

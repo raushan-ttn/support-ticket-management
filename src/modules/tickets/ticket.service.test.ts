@@ -176,7 +176,7 @@ describe('transitionStatus', () => {
     ['RESOLVED', 'IN_PROGRESS'],
     ['CLOSED', 'OPEN'],
     ['CANCELLED', 'OPEN'],
-  ])('rejects invalid transition %s → %s with 409', async (from, to) => {
+  ])('rejects invalid transition %s → %s with 409 and from/to in error', async (from, to) => {
     mockWithTransaction.mockImplementation(async (fn) => {
       const mockClient = {
         query: jest.fn().mockResolvedValueOnce({
@@ -188,7 +188,7 @@ describe('transitionStatus', () => {
     });
 
     await expect(transitionStatus(TICKET_ID, to as never, ADMIN_ID, 'ADMIN')).rejects.toMatchObject(
-      { statusCode: 409, code: 'INVALID_STATUS_TRANSITION' },
+      { statusCode: 409, code: 'INVALID_STATUS_TRANSITION', extra: { from, to } },
     );
   });
 

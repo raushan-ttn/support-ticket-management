@@ -168,24 +168,24 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Phase 9 — Tests
 
-- [ ] **State machine (TEST-1)**
-  - [ ] Integration: all valid transitions succeed (`OPEN→IN_PROGRESS`, `IN_PROGRESS→RESOLVED`, `RESOLVED→CLOSED`, `OPEN→CANCELLED`, `IN_PROGRESS→CANCELLED`)
-  - [ ] Integration: representative invalid transitions return `409` + `INVALID_STATUS_TRANSITION`
-- [ ] **Ticket creation (TEST-2):** client-supplied `status`/`assignedTo` ignored; auto-assigned to admin with `OPEN`
-- [ ] **RBAC scoping (TEST-3):** admin lists all tickets; agent list correctly scoped — FR-2a, SF-5
-- [ ] **Assignment (TEST-4):** `403` for agent caller; `400` for non-existent target user — FR-7
-- [ ] **Validation (TEST-5):** rejects missing/empty `title`, `description`, `message`; invalid enum values — VAL-2/VAL-3
-- [ ] **Notifications (TEST-7)** — direct call, no queue
-  - [ ] New-ticket send: sent to creator + admin; de-duplicated if same person — FR-10
-  - [ ] Comment-notification send: excludes comment author; correct recipient set for all role combos — FR-11
-  - [ ] Uses captured/JSON transport — no real mail sent — TS-7
-- [ ] **Attachments (TEST-9)**
-  - [ ] Allowed PNG/JPG within size limit → attachment metadata row created; `storageKey` absent from response; `url` present — FR-13
-  - [ ] Disallowed MIME (e.g. PDF, GIF) → `415`; oversize → `400`; over file count → `400` — VAL-6, FR-13b
-  - [ ] Ticket detail (`GET /api/v1/tickets/:id`) includes inline `attachments` array with correct metadata + `url` — FR-14
-  - [ ] Comment list/detail includes inline `attachments` array per comment — FR-14
-  - [ ] Caller without parent-ticket access → `403` on ticket/comment endpoints — RBAC-3/4
-  - [ ] Uses `STORAGE_BACKEND=local` + `STORAGE_LOCAL_DIR=.tmp/test-uploads` test directory; files cleaned up in `afterAll`
+- [x] **State machine (TEST-1)**
+  - [x] Integration: all valid transitions succeed (`OPEN→IN_PROGRESS`, `IN_PROGRESS→RESOLVED`, `RESOLVED→CLOSED`, `OPEN→CANCELLED`, `IN_PROGRESS→CANCELLED`)
+  - [x] Integration: representative invalid transitions return `409` + `INVALID_STATUS_TRANSITION`
+- [x] **Ticket creation (TEST-2):** client-supplied `status`/`assignedTo` ignored; auto-assigned to admin with `OPEN`
+- [x] **RBAC scoping (TEST-3):** admin lists all tickets; agent list correctly scoped — FR-2a, SF-5
+- [x] **Assignment (TEST-4):** `403` for agent caller; `400` for non-existent target user — FR-7
+- [x] **Validation (TEST-5):** rejects missing/empty `title`, `description`, `message`; invalid enum values — VAL-2/VAL-3
+- [x] **Notifications (TEST-7)** — direct call, no queue
+  - [x] New-ticket send: sent to creator + admin; de-duplicated if same person — FR-10
+  - [x] Comment-notification send: excludes comment author; correct recipient set for all role combos — FR-11
+  - [x] Uses captured/JSON transport — no real mail sent — TS-7
+- [x] **Attachments (TEST-9)**
+  - [x] Allowed PNG/JPG within size limit → attachment metadata row created; `storageKey` absent from response; `url` present — FR-13
+  - [x] Disallowed MIME (e.g. PDF, GIF) → `415`; oversize → `400`; over file count → `400` — VAL-6, FR-13b
+  - [x] Ticket detail (`GET /api/v1/tickets/:id`) includes inline `attachments` array with correct metadata + `url` — FR-14
+  - [x] Comment list/detail includes inline `attachments` array per comment — FR-14
+  - [x] Caller without parent-ticket access → `403` on ticket/comment endpoints — RBAC-3/4
+  - [x] Uses `STORAGE_BACKEND=local` + `STORAGE_LOCAL_DIR=.tmp/test-uploads` test directory; files cleaned up in `afterAll`
 
 ---
 
@@ -217,22 +217,33 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 ## Acceptance Criteria Checklist (§13)
 
-- [ ] Ticket created via API; persisted; auto-assigned to admin with `OPEN` status
-- [ ] Admin sees all tickets; agents scoped to assigned/created
-- [ ] Ticket detail retrievable by id (`404`/`403` on miss/scope)
-- [ ] Title, description, priority updatable; assignee change is admin-only
-- [ ] Comments addable and listable; admin reads any ticket's comments
-- [ ] Status transitions only through valid paths; invalid → `409`
-- [ ] Keyword search and status filter work and respect caller scope
-- [ ] Data survives restart (Postgres)
-- [ ] Backend validation blocks invalid records
-- [ ] Redis cache accelerates reads; degrades gracefully when unavailable
-- [ ] No secrets committed
-- [ ] State-machine integration tests pass
-- [ ] New ticket emails creator + admin (async, non-blocking, direct call — no queue)
-- [ ] New comment emails all involved parties, de-duplicated, excluding author
-- [ ] Notification failures logged; never fail the originating request (no retry — direct call, not queued)
-- [ ] PNG/JPG files uploadable to a ticket or comment via ticket/comment mutation endpoints; metadata in Postgres, bytes in storage backend
-- [ ] Upload rejects non-PNG/JPG MIME types, oversize files, and over-count requests
-- [ ] Attachment metadata (including direct-access `url`) returned inline in ticket detail and comment list/detail responses
-- [ ] No separate attachment endpoints; no bytes cached in Redis
+> **Verified 2026-07-09** against current code + a full `--runInBand` test pass (123/123
+> green) on a freshly migrated `ttn_stm_test`. See note at bottom on default `npm test`.
+
+- [x] Ticket created via API; persisted; auto-assigned to admin with `OPEN` status
+- [x] Admin sees all tickets; agents scoped to assigned/created
+- [x] Ticket detail retrievable by id (`404`/`403` on miss/scope)
+- [x] Title, description, priority updatable; assignee change is admin-only
+- [x] Comments addable and listable; admin reads any ticket's comments
+- [x] Status transitions only through valid paths; invalid → `409`
+- [x] Keyword search and status filter work and respect caller scope
+- [x] Data survives restart (Postgres)
+- [x] Backend validation blocks invalid records
+- [x] Redis cache accelerates reads; degrades gracefully when unavailable
+- [x] No secrets committed
+- [x] State-machine integration tests pass
+- [x] New ticket emails creator + admin (async, non-blocking, direct call — no queue)
+- [x] New comment emails all involved parties, de-duplicated, excluding author
+- [x] Notification failures logged; never fail the originating request (no retry — direct call, not queued)
+- [x] PNG/JPG files uploadable to a ticket or comment via ticket/comment mutation endpoints; metadata in Postgres, bytes in storage backend
+- [x] Upload rejects non-PNG/JPG MIME types, oversize files, and over-count requests
+- [x] Attachment metadata (including direct-access `url`) returned inline in ticket detail and comment list/detail responses
+- [x] No separate attachment endpoints; no bytes cached in Redis
+
+> **Note:** `ttn_stm_test` in this environment hadn't been migrated with the
+> `type`/`sub_type`/screenshot-drop blocks, which caused spurious `500`s — fixed by
+> running `NODE_ENV=test npm run db:migrate` (environment issue, not a code defect).
+> Separately, default `npm test` (parallel Jest workers) shows `users_email_key`
+> collisions because all workers share one live DB; every suite passes with
+> `--runInBand`. Not a functional bug, but worth adding `maxWorkers: 1` (or a
+> per-worker schema/DB) to the Jest config if flaky CI runs become a problem.
