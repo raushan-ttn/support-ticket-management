@@ -8,9 +8,15 @@ export interface StorageBackend {
   delete(key: string): Promise<void>;
 }
 
-export function buildStorageKey(): string {
+const MIME_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+};
+
+export function buildStorageKey(mimeType: string): string {
   const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  return `${date}/${randomUUID()}`;
+  const ext = MIME_EXTENSIONS[mimeType] ?? '';
+  return `${date}/${randomUUID()}${ext}`;
 }
 
 let _backend: StorageBackend | null = null;

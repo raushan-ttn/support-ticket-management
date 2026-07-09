@@ -80,7 +80,7 @@ export async function uploadAttachments(
 
   for (const file of files) {
     const sanitized = sanitizeFilename(file.originalname) || 'unnamed';
-    const storageKey = buildStorageKey();
+    const storageKey = buildStorageKey(file.mimetype);
 
     try {
       await backend.save(storageKey, Readable.from(file.buffer), file.mimetype, file.size);
