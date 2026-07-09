@@ -72,7 +72,6 @@ const options: swaggerJsdoc.Options = {
             description: { type: 'string', example: 'Steps to reproduce...' },
             type: { type: 'string', nullable: true, example: 'BUG' },
             subType: { type: 'string', nullable: true, example: 'AUTH' },
-            screenshot: { type: 'string', format: 'uri', nullable: true },
             priority: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] },
             status: {
               type: 'string',
@@ -106,7 +105,6 @@ const options: swaggerJsdoc.Options = {
             id: { type: 'string', format: 'uuid' },
             ticketId: { type: 'string', format: 'uuid' },
             message: { type: 'string', example: 'Looking into this now.' },
-            screenshot: { type: 'string', format: 'uri', nullable: true },
             createdBy: { type: 'string', format: 'uuid' },
             createdByName: { type: 'string', example: 'Jane Agent' },
             createdAt: { type: 'string', format: 'date-time' },

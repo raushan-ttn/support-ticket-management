@@ -4,6 +4,7 @@ dotenv.config();
 interface Config {
   env: string;
   port: number;
+  appUrl: string;
   cors: {
     origin: string;
   };
@@ -64,6 +65,7 @@ interface Config {
 const config: Config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
+  appUrl: process.env.APP_URL || `http://localhost:${parseInt(process.env.PORT || '3000', 10)}`,
 
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',

@@ -1,10 +1,7 @@
-import { Readable } from 'stream';
-
 import config from '../../config';
 import { query } from '../../config/postgres';
 import { deleteCache, getCache, setCache } from '../../config/redis';
 import { sendCommentNotificationEmail } from '../../jobs/notifications';
-import { buildStorageKey, getStorageBackend } from '../../storage';
 import type { CommentNotificationJobData } from '../../types/jobs';
 import type { UserRole } from '../auth/auth.schemas';
 import {
@@ -23,24 +20,11 @@ function createHttpError(message: string, statusCode: number, code?: string): Er
   return err;
 }
 
-const ALLOWED_SCREENSHOT_MIMES = new Set(['image/jpeg', 'image/png']);
-
-function toScreenshotUrl(key: string | null): string | null {
-  if (!key) return null;
-  if (config.storage.backend === 's3') {
-    const { endpoint, bucket, region } = config.storage.s3;
-    const base = endpoint ?? `https://${bucket}.s3.${region}.amazonaws.com`;
-    return `${base}/${key}`;
-  }
-  return `/uploads/${key}`;
-}
-
 // DB-only comment row (no attachments field — not a DB column)
 interface CommentDbRow {
   id: string;
   ticketId: string;
   message: string;
-  screenshot: string | null;
   createdBy: string;
   createdByName: string;
   createdAt: string;
@@ -68,7 +52,6 @@ const COMMENT_SELECT = `
   c.id,
   c.ticket_id  AS "ticketId",
   c.message,
-  c.screenshot,
   c.created_by AS "createdBy",
   u.name       AS "createdByName",
   c.created_at AS "createdAt"
@@ -77,60 +60,29 @@ const COMMENT_SELECT = `
 export async function addComment(
   ticketId: string,
   message: string,
-  file: Express.Multer.File | undefined,
   attachmentFiles: Express.Multer.File[] | undefined,
   callerId: string,
   callerRole: UserRole,
 ): Promise<CommentRow> {
   const ticket = await getTicketById(ticketId, callerId, callerRole);
 
-  let screenshotKey: string | null = null;
-
-  if (file !== undefined) {
-    if (!ALLOWED_SCREENSHOT_MIMES.has(file.mimetype)) {
-      throw createHttpError(
-        `Screenshot must be image/jpeg or image/png, got ${file.mimetype}`,
-        415,
-        'UNSUPPORTED_MEDIA_TYPE',
-      );
-    }
-    const key = buildStorageKey();
-    const backend = await getStorageBackend();
-    await backend.save(key, Readable.from(file.buffer), file.mimetype, file.size);
-    screenshotKey = key;
-  }
-
-  let result: { rows: CommentDbRow[]; rowCount: number | null };
-  try {
-    result = await query<CommentDbRow>(
-      `WITH inserted AS (
-         INSERT INTO comments (ticket_id, message, screenshot, created_by)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, ticket_id, message, screenshot, created_by, created_at
-       )
-       SELECT ${COMMENT_SELECT}
-       FROM inserted c
-       JOIN users u ON u.id = c.created_by`,
-      [ticketId, message, screenshotKey, callerId],
-    );
-  } catch (dbErr) {
-    if (screenshotKey !== null) {
-      try {
-        const backend = await getStorageBackend();
-        await backend.delete(screenshotKey);
-      } catch {
-        // best-effort cleanup
-      }
-    }
-    throw dbErr;
-  }
+  const result = await query<CommentDbRow>(
+    `WITH inserted AS (
+       INSERT INTO comments (ticket_id, message, created_by)
+       VALUES ($1, $2, $3)
+       RETURNING id, ticket_id, message, created_by, created_at
+     )
+     SELECT ${COMMENT_SELECT}
+     FROM inserted c
+     JOIN users u ON u.id = c.created_by`,
+    [ticketId, message, callerId],
+  );
 
   if (!result.rows[0]) {
     throw createHttpError('Failed to create comment', 500);
   }
 
   const commentId = result.rows[0].id;
-  const screenshot = toScreenshotUrl(result.rows[0].screenshot);
 
   // Upload attachment files if provided (fire-and-forget on error)
   let attachments: AttachmentRow[] = [];
@@ -144,7 +96,6 @@ export async function addComment(
 
   const comment: CommentRow = {
     ...result.rows[0],
-    screenshot,
     attachments,
   };
 
@@ -229,7 +180,6 @@ export async function listComments(
        c.id,
        c.ticket_id  AS "ticketId",
        c.message,
-       c.screenshot,
        c.created_by AS "createdBy",
        u.name       AS "createdByName",
        c.created_at AS "createdAt",
@@ -262,7 +212,6 @@ export async function listComments(
     id: row.id,
     ticketId: row.ticketId,
     message: row.message,
-    screenshot: toScreenshotUrl(row.screenshot),
     createdBy: row.createdBy,
     createdByName: row.createdByName,
     createdAt: row.createdAt,
@@ -304,7 +253,6 @@ export async function getCommentById(
 
   return {
     ...dbRow,
-    screenshot: toScreenshotUrl(dbRow.screenshot),
     attachments,
   };
 }

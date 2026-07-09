@@ -46,7 +46,7 @@ incoming tickets and assigns them to the agent responsible for the work.
 | TS-6  | The service must start successfully and serve health checks even if Redis is unavailable (graceful cache degradation — see CACHE-7). It must **not** start if Postgres is unreachable. |
 | TS-7  | **Email transport (SMTP).** Outbound notifications are sent via a configurable SMTP transport (env-driven). Dev/test may use a capture transport (e.g. Mailhog, or an in-memory/console transport) — no real mail in tests. |
 | TS-8  | *(Removed 2026-07-08 — see §1.2 Out of Scope.)* Previously: Redis-backed job queue (BullMQ) for async email delivery and the delayed auto-close job. Email (§5.4) is now sent via a direct, non-queued call. No BullMQ queue is part of this implementation. |
-| TS-9  | **File storage backend.** Attachment binaries are stored in an object/file store — local filesystem (`public/uploads/` directory, served as static files via `express.static`) for dev, S3-compatible object storage for prod — selected via `STORAGE_BACKEND` env config. The storage backend returns a public-accessible URL (`url`) for each saved file; no separate download endpoint is required. **Binaries are never stored in Postgres** (Postgres holds metadata only) and **never cached in Redis** (CACHE-9). Multipart upload handling is required. |
+| TS-9  | **File storage backend.** Attachment binaries are stored in an object/file store — local filesystem (`STORAGE_LOCAL_DIR`, default `public/`, served as static files via `express.static`) for dev, S3-compatible object storage for prod — selected via `STORAGE_BACKEND` env config. The storage backend returns a public-accessible, **absolute** URL (`url`) for each saved file — `{APP_URL}/{storageKey}` for local (`APP_URL` env, default `http://localhost:{PORT}`), the S3 object URL for prod — so the URL can be opened directly in a browser without a separate download endpoint. *(Corrected 2026-07-09: earlier text described a relative `/uploads/…` path; the actual, and now required, behavior is an absolute URL — see bug fix in `.claude/plans/attachments-module.md`.)* **Binaries are never stored in Postgres** (Postgres holds metadata only) and **never cached in Redis** (CACHE-9). Multipart upload handling is required. |
 
 ---
 
@@ -73,7 +73,7 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 | description | text | NOT NULL, non-empty after trim |
 | type        | string (max 100) | NULLABLE — ticket classification (e.g. `BUG`, `FEATURE_REQUEST`, `SUPPORT`, `INCIDENT`) |
 | subType     | string (max 100) | NULLABLE — sub-classification (e.g. `UI`, `API`, `AUTHENTICATION`, `EMAIL`) |
-| screenshot  | string (URL) | NULLABLE — URL of a screenshot linked to the ticket |
+| ~~screenshot~~ | ~~string (URL)~~ | *(Removed 2026-07-09 — see DM-13)* |
 | priority    | enum(`LOW`, `MEDIUM`, `HIGH`, `URGENT`) | NOT NULL, default `MEDIUM` |
 | status      | enum(`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED`) | NOT NULL, default `OPEN` |
 | assignedTo  | FK → User.id | **NOT NULL** (always set on creation — see FR-1) |
@@ -85,7 +85,7 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 - **DM-4:** `assignedTo` and `createdBy` must reference existing users (FK enforced).
 - **DM-5:** Index `status` and `assignedTo` to support filtering (§6) without full scans.
 - **DM-12:** `type` and `subType` are nullable free-text fields (`VARCHAR(100)`); valid values are application-governed (no DB ENUM) so new categories can be added without schema changes. Index both for filter support.
-- **DM-13:** `screenshot` on `tickets` and `comments` stores a plain URL string — it is not a storage key and is entirely separate from the `attachments` system (§3.4). Bytes are never stored; only the URL is persisted.
+- **DM-13:** *(Removed 2026-07-09.)* Previously specified a `screenshot` plain-URL string column on `tickets` and `comments`, separate from the `attachments` system (§3.4). Dropped in favor of the `attachments` system exclusively — see `.claude/plans/tickets-module.md` / `comments-module.md` for the migration note and `src/db/schema.sql` Migration 2026-07-09.
 
 ### 3.3 `Comment`
 | Field      | Type | Constraints |
@@ -93,13 +93,13 @@ Stored enum values are uppercase snake-case. All timestamps are stored in UTC.
 | id         | UUID / serial | PK |
 | ticketId   | FK → Ticket.id | NOT NULL |
 | message    | text | NOT NULL, non-empty after trim |
-| screenshot | string (storage path / URL) | NULLABLE — path/URL of an uploaded screenshot file for this comment (see DM-13a) |
+| ~~screenshot~~ | ~~string (storage path / URL)~~ | *(Removed 2026-07-09 — see DM-13a)* |
 | createdBy  | FK → User.id | NOT NULL |
 | createdAt  | timestamptz | NOT NULL, set on insert |
 
 - **DM-6:** Deleting a ticket (if ever supported) cascades to its comments. Deletion is out of scope for Core.
 - **DM-7:** Index `ticketId` to support comment retrieval per ticket.
-- **DM-13a:** `screenshot` on **comments** is the result of a file upload (jpg/png only). The backend stores the file via the storage backend (TS-9), saves the resulting path/URL in `comments.screenshot`, and includes it in list/detail responses. This is distinct from `tickets.screenshot` (DM-13) which remains a plain client-provided URL string.
+- **DM-13a:** *(Removed 2026-07-09.)* Previously specified `screenshot` on **comments** as a single-file-upload column (jpg/png only), distinct from `tickets.screenshot` (DM-13). Comment-level screenshots are now uploaded through the same `attachments` system as ticket-level files (§3.4, FR-8/FR-9) — `addComment` accepts a `files` array via the shared `uploadAttachmentFiles` middleware, same as tickets.
 
 ### 3.4 `Attachment`
 | Field      | Type | Constraints |
@@ -183,11 +183,11 @@ requirement; the API must be able to establish who is calling and with what role
 ### 5.3 Comment Requirements
 | ID    | Requirement |
 |-------|-------------|
-| **FR-8** | **Add comment.** `POST /api/tickets/:id/comments` accepts `multipart/form-data` with `message` (required, non-empty text) and an optional `screenshot` file (jpg/png only). Persists the comment with `ticketId`, `message`, `createdBy` (the caller), `createdAt`, and `screenshot` (storage path/URL after upload, or null). |
+| **FR-8** | **Add comment.** `POST /api/tickets/:id/comments` accepts `multipart/form-data` with `message` (required, non-empty text) and an optional `files` array (see §5.6 File Attachment Requirements — same allowlist, limits, and `attachments` system used by tickets). Persists the comment with `ticketId`, `message`, `createdBy` (the caller), `createdAt`. *(2026-07-09: the single `screenshot` file field was removed — see DM-13a — in favor of the shared `files`/`attachments` mechanism.)* |
 | FR-8a | Adding a comment to a non-existent ticket → `404`. |
-| FR-8b | If a screenshot file is provided, validate MIME type (`image/jpeg`, `image/png` only) and file size against configured limits; reject with `415` for disallowed MIME types. Store via the storage backend (TS-9); save the resulting path/URL in `comments.screenshot`. Never store raw bytes in Postgres. |
-| **FR-9** | **List comments.** `GET /api/tickets/:id/comments` returns the ticket's comments ordered by `createdAt` ascending. Each comment object includes the `screenshot` field (path/URL string or null). |
-| FR-9a | **Get comment by ID.** `GET /api/tickets/:id/comments/:commentId` returns a single comment including the `screenshot` field. Returns `404` if the comment does not exist or does not belong to the ticket. |
+| FR-8b | *(Removed 2026-07-09 — see DM-13a.)* Previously specified dedicated screenshot MIME/size validation; comment file uploads now validate through the same `uploadAttachmentFiles` middleware/allowlist as ticket attachments. |
+| **FR-9** | **List comments.** `GET /api/tickets/:id/comments` returns the ticket's comments ordered by `createdAt` ascending. Each comment object includes an `attachments` array (§3.4). |
+| FR-9a | **Get comment by ID.** `GET /api/tickets/:id/comments/:commentId` returns a single comment including its `attachments` array. Returns `404` if the comment does not exist or does not belong to the ticket. |
 
 ### 5.4 Notification Requirements (Email)
 
@@ -232,9 +232,9 @@ integrated into ticket/comment mutation endpoints and metadata is embedded in th
 | **FR-13** | **Upload.** One or more files (up to the configured per-request limit) are accepted as optional `multipart/form-data` on: `POST /api/tickets` (ticket-level attachments), `PATCH /api/tickets/:id` (additional ticket-level attachments), and `POST /api/tickets/:id/comments` (comment-level attachments linked to the new comment via `commentId`). A ticket or comment may accumulate multiple attachments across calls. Each file is persisted to the storage backend and a metadata row is recorded (§3.4). |
 | FR-13a | The uploader must have access to the parent ticket; otherwise `403`. Upload to a non-existent ticket → `404`. |
 | FR-13b | **Validation (VAL-6):** only `image/jpeg` and `image/png` MIME types are accepted — all other types are rejected with `415`. Files exceeding the configured per-file size limit or per-request file count limit are rejected with `400`. Validate **before** persisting bytes. |
-| FR-13c | Original filenames are **sanitized** (`sanitize-filename`); storage keys are server-generated (UUID-based) so a client cannot influence the storage path. The storage backend returns a public-accessible `url` for each saved file — a static path (`/uploads/…`) for local dev, an S3 object URL for prod. |
-| **FR-14** | **Access via responses.** A ticket or comment may have **multiple attachments**. Attachment metadata — `{ id, filename, mimeType, sizeBytes, uploadedBy, createdAt, commentId, url }` — is returned as an array (`attachments: AttachmentRow[]`) inline in: `GET /api/tickets/:id` (all attachments for the ticket), `GET /api/tickets/:id/comments` (per-comment `attachments` array), and `GET /api/tickets/:id/comments/:commentId`. The `url` provides direct file access; `storageKey` is never exposed. |
-| FR-15 | **No separate download endpoint.** Files are accessed directly via the `url` field in responses. Local dev serves files from `public/uploads/` as static assets via `express.static`; S3 prod serves files via S3 object URL. |
+| FR-13c | Original filenames are **sanitized** (`sanitize-filename`); storage keys are server-generated (UUID-based) so a client cannot influence the storage path. The storage backend returns a public-accessible, absolute `url` for each saved file — `{APP_URL}/{storageKey}` for local dev, an S3 object URL for prod — so it opens directly in a browser (see TS-9). |
+| **FR-14** | **Access via responses.** A ticket or comment may have **multiple attachments**. Attachment metadata — `{ id, filename, mimeType, sizeBytes, uploadedBy, createdAt, commentId, url }` — is returned as an array (`attachments: AttachmentRow[]`) inline in: `GET /api/tickets` (list — every ticket's attachments), `GET /api/tickets/:id` (all attachments for the ticket), `GET /api/tickets/:id/comments` (per-comment `attachments` array), and `GET /api/tickets/:id/comments/:commentId`. The `url` provides direct file access; `storageKey` is never exposed. *(Fixed 2026-07-09: `GET /api/tickets` previously hardcoded `attachments: []` instead of fetching them — see `.claude/plans/tickets-module.md`.)* |
+| FR-15 | **No separate download endpoint.** Files are accessed directly via the `url` field in responses. Local dev serves files from `STORAGE_LOCAL_DIR` (default `public/`) as static assets via `express.static`, with `url` built as `{APP_URL}/{storageKey}`; S3 prod serves files via S3 object URL. |
 | FR-16 | **Metadata cache.** Attachment metadata for a ticket is cached as `ticket:{id}:attachments` and invalidated on every new upload (CACHE-9). Attachment bytes are never cached in Redis. |
 
 ---
@@ -369,7 +369,7 @@ Cache-aside pattern. Redis accelerates reads; Postgres remains authoritative.
   confirm if a self-copy is wanted.
 - **"Admin" recipient** = the designated admin (same resolution as FR-1). If multiple
   admins exist, confirm whether all admins or only the designated one are notified.
-- **Attachment storage backend** is config-driven: local filesystem (`public/uploads/`, static-served) for dev, S3-compatible for prod. Confirm the prod target (e.g. AWS S3, MinIO).
+- **Attachment storage backend** is config-driven: local filesystem (`STORAGE_LOCAL_DIR`, default `public/`, static-served, absolute URLs via `APP_URL`) for dev, S3-compatible for prod. Confirm the prod target (e.g. AWS S3, MinIO).
 - **Attachment MIME allowlist** is fixed to `image/jpeg` and `image/png` — no PDFs or office documents.
 - **Attachment limits** (max file size, max files per request) are env-configured. Suggested defaults: 5 MB/file, 5 files/request.
 - **Attachments attach at ticket level and optionally at comment level**; both share one `Attachment` table scoped by `ticketId`. No standalone attachment upload/download/delete endpoints.

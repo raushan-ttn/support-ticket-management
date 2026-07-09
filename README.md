@@ -16,8 +16,8 @@ npm run dev
 
 - User authentication and role-based access control (ADMIN, AGENT)
 - Ticket lifecycle management: creation, listing, retrieval, updates, assignment, and state machine status transitions
-- Comment threads per ticket, each with optional screenshot URL and user attribution (`createdByName`)
-- File attachments (image/jpeg, image/png only) — multiple files per ticket or per comment; uploaded inline via `multipart/form-data` on ticket create/update and comment creation, no standalone attachment endpoints. Attachment metadata (`id`, `filename`, `mimeType`, `sizeBytes`, `uploadedBy`, `createdAt`, `url`) is embedded in ticket and comment responses; `storageKey` is never exposed. Local filesystem (dev, served via `express.static`) or S3 (prod) storage backend, selected via `STORAGE_BACKEND`
+- Comment threads per ticket, with user attribution (`createdByName`) and inline file attachments
+- File attachments (image/jpeg, image/png only) — multiple files per ticket or per comment; uploaded inline via `multipart/form-data` on ticket create/update and comment creation, no standalone attachment endpoints. Attachment metadata (`id`, `filename`, `mimeType`, `sizeBytes`, `uploadedBy`, `createdAt`, `url`) is embedded in ticket and comment responses; `storageKey` is never exposed. `url` is an absolute, browser-openable URL (`APP_URL` + storage key for local dev, S3 object URL for prod). Local filesystem (dev, served via `express.static`) or S3 (prod) storage backend, selected via `STORAGE_BACKEND`
 - JWT-based session management with Passport
 - Redis caching for read-heavy operations, including per-ticket attachment metadata (`ticket:{id}:attachments`)
 - Email notifications (planned): direct SMTP/nodemailer send, fire-and-forget, no job queue, for new tickets and comments — see `.claude/plans/notifications-email.md`. Auto-close-on-stale-reply is out of scope (would have required a BullMQ delayed-job queue).
@@ -58,7 +58,7 @@ Interactive API documentation is available via **Swagger UI** at `GET /api-docs`
 | `PATCH` | `/api/v1/tickets/:id` | Update ticket title, description, or priority; accepts optional `files` to add further ticket-level attachments |
 | `PATCH` | `/api/v1/tickets/:id/status` | Transition ticket status through valid state machine paths |
 | `POST` | `/api/v1/tickets/:id/assign` | Assign ticket to user (ADMIN only) |
-| `POST` | `/api/v1/tickets/:ticketId/comments` | Add comment to ticket with optional screenshot file (`screenshot`) and/or comment-level attachments (`files`, image/jpeg or image/png, multipart/form-data) |
+| `POST` | `/api/v1/tickets/:ticketId/comments` | Add comment to ticket with optional comment-level attachments (`files`, image/jpeg or image/png, multipart/form-data) |
 | `GET` | `/api/v1/tickets/:ticketId/comments` | List ticket comments ordered by creation time, each with an inline `attachments` array; RBAC-scoped; Redis-cached |
 | `GET` | `/api/v1/tickets/:ticketId/comments/:commentId` | Fetch single comment by ID, including inline `attachments` array; RBAC-scoped |
 
@@ -74,7 +74,8 @@ See `.sample.env` for a complete list. Key variables:
 - `REDIS_*` — Redis cache parameters
 - `JWT_SECRET` — Secret key for JWT signing (change in production)
 - `CORS_ORIGIN` — Allowed origin for CORS (never wildcard in production)
-- `STORAGE_BACKEND` — `local` (default) or `s3`; selects the attachment/screenshot storage backend
+- `APP_URL` — base URL used to build absolute attachment `url`s for the local storage backend (default: `http://localhost:{PORT}`)
+- `STORAGE_BACKEND` — `local` (default) or `s3`; selects the attachment storage backend
 - `STORAGE_LOCAL_DIR` — local storage root (default: `public`), served statically at `/`
 - `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_ENDPOINT` — S3-compatible storage config (used when `STORAGE_BACKEND=s3`)
 - `ATTACHMENT_MAX_FILE_SIZE_BYTES` — per-file size limit for attachments (default: 10 MB)

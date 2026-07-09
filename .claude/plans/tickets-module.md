@@ -1,5 +1,10 @@
 # Tickets Module — Implementation Plan
 
+> **Note (2026-07-09):** the `tickets.screenshot` field/column referenced throughout
+> this plan (a plain client-supplied URL string, DM-13) has been **removed** — see
+> `task.md` Phase 10 cleanup item and `requirements.md` DM-13. It is superseded by the
+> `attachments` system (Phase 6). Historical content below is left as-is for context.
+
 ## Problem
 
 Implement Phase 4 of the Support Ticket Management backend: the full ticket lifecycle (create, list, get, update, status transition, assign) with RBAC-scoped access, server-authoritative state machine, keyword search, pagination, and Redis caching. This is the central domain module — comments, attachments, and notifications all depend on it (auto-close was later removed from scope).

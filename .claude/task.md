@@ -31,7 +31,7 @@ Traceable to `requirements.md`. Check off items as they are completed.
   - [x] Make `tickets.description` NOT NULL — §3.2
   - [x] Add `attachments` table (id, ticket_id FK, comment_id FK nullable, filename, storage_key, mime_type, size_bytes, uploaded_by FK, created_at) — §3.4, DM-8–DM-11
   - [x] Add index on `attachments.ticket_id` (and `comment_id`) — DM-11
-  - [x] **Schema migration 2026-07-01:** add `type VARCHAR(100)`, `sub_type VARCHAR(100)`, `screenshot TEXT` (nullable) to `tickets`; add `screenshot TEXT` (nullable) to `comments`; add indexes on `tickets.type` and `tickets.sub_type` — DM-12, DM-13
+  - [x] **Schema migration 2026-07-01:** add `type VARCHAR(100)`, `sub_type VARCHAR(100)`, ~~`screenshot TEXT` (nullable)~~ to `tickets`; add ~~`screenshot TEXT` (nullable)~~ to `comments`; add indexes on `tickets.type` and `tickets.sub_type` — DM-12, DM-13 — **screenshot columns dropped 2026-07-09, see Phase 10 cleanup item**
 - [x] `src/db/migrate.ts` — run schema.sql idempotently
 - [x] `src/db/admin-seed.ts` — seeds 1 admin + 5 agents; bcrypt at 12 rounds — DM-2, TS-4
 - [x] `src/db/tickets-seed.ts` — seeds 10 realistic tickets (with type/subType) + 2-3 comments each — TS-4
@@ -60,16 +60,16 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 4 — Tickets Module ✅
 
 - [x] `src/modules/tickets/ticket.schemas.ts`
-  - [x] `createTicketSchema` (title, description, priority?, type?, subType?, screenshot?) — FR-1b, VAL-2/VAL-3, DM-12/DM-13
-  - [x] `updateTicketSchema` (title?, description?, priority?, type?, subType?, screenshot?) with `.refine` at-least-one — FR-4, DM-12/DM-13
+  - [x] `createTicketSchema` (title, description, priority?, type?, subType?, ~~screenshot?~~) — FR-1b, VAL-2/VAL-3, DM-12/DM-13 — **screenshot field removed 2026-07-09, see Phase 10 cleanup item**
+  - [x] `updateTicketSchema` (title?, description?, priority?, type?, subType?, ~~screenshot?~~) with `.refine` at-least-one — FR-4, DM-12/DM-13 — **screenshot field removed 2026-07-09**
   - [x] `statusTransitionSchema` (status enum) — FR-5
   - [x] `assignSchema` (assignedTo uuid) — FR-7
   - [x] `listTicketsQuerySchema` (status?, priority?, type?, search?, page, limit, sortBy, order) — SF-1–SF-4, DM-12
   - [x] Inferred TypeScript types via `z.infer`
-  - [x] `TicketRow` response interface with `type`, `subType`, `screenshot` (nullable strings)
+  - [x] `TicketRow` response interface with `type`, `subType` (nullable strings) — **`screenshot` field removed 2026-07-09**
 - [x] `src/modules/tickets/ticket.service.ts`
   - [x] `createTicket()` — auto-assign to admin, force `status=OPEN`, `createdBy=caller` — FR-1, FR-1a
-  - [x] `listTickets()` — admin sees all; agent scoped to assigned/created; RBAC filter in SQL `WHERE` — FR-2, FR-2a, RBAC-3/4, SF-5
+  - [x] `listTickets()` — admin sees all; agent scoped to assigned/created; RBAC filter in SQL `WHERE`; each ticket includes its `attachments` array via `withAttachments()` — FR-2, FR-2a, RBAC-3/4, SF-5, FR-14 — **bug fix 2026-07-09: previously hardcoded `attachments: []`, see Phase 10 cleanup item**
   - [x] `getTicketById()` — 404 if not found, 403 if out of scope — FR-3
   - [x] `updateTicket()` — title/description/priority; admin-only assignee update — FR-4, FR-4a, RBAC-5
   - [x] `transitionStatus()` — state machine read-then-write inside `withTransaction()`, row lock `FOR UPDATE`; 409 on invalid — FR-5, SM-1–SM-5
@@ -92,12 +92,12 @@ Traceable to `requirements.md`. Check off items as they are completed.
 ## Phase 5 — Comments Module
 
 - [x] `src/modules/comments/comment.schemas.ts`
-  - [x] `createCommentSchema` (message non-empty via text field; screenshot is a multer file, not a Zod field) — FR-8, VAL-2, DM-13a
-  - [x] `CommentRow` response interface — include `id`, `ticketId`, `message`, `screenshot: string | null`, `createdBy`, `createdAt`
+  - [x] `createCommentSchema` (message non-empty via text field; ~~screenshot is a multer file, not a Zod field~~) — FR-8, VAL-2, DM-13a — **screenshot field removed 2026-07-09, see Phase 10 cleanup item**
+  - [x] `CommentRow` response interface — include `id`, `ticketId`, `message`, `createdBy`, `createdAt` — **`screenshot: string | null` field removed 2026-07-09**
 - [x] `src/modules/comments/comment.service.ts`
-  - [x] `addComment()` — verify ticket exists (404); verify caller scope (403); store screenshot file via storage backend if provided (FR-8b); insert row; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, FR-8b, CACHE-5, FR-11 — **queue call is dead code, see Phase 7 cleanup item**
-  - [x] `listComments()` — admin sees all; agent scoped; ordered by `created_at ASC`; include `screenshot` in SELECT — FR-9, FR-6, RBAC-3/4
-  - [x] `getCommentById()` — return single comment with `screenshot`; 404 if not found or wrong ticket — FR-9a
+  - [x] `addComment()` — verify ticket exists (404); verify caller scope (403); ~~store screenshot file via storage backend if provided (FR-8b)~~; insert row; invalidate `ticket:{id}:comments` cache; trigger email notification queue job — FR-8, FR-8a, CACHE-5, FR-11 — **queue call is dead code, see Phase 7 cleanup item; screenshot handling removed 2026-07-09, see Phase 10 cleanup item**
+  - [x] `listComments()` — admin sees all; agent scoped; ordered by `created_at ASC` — FR-9, FR-6, RBAC-3/4 — **`screenshot` removed from SELECT 2026-07-09**
+  - [x] `getCommentById()` — return single comment; 404 if not found or wrong ticket — FR-9a — **`screenshot` field removed 2026-07-09**
   - [x] Cache: `getCache/setCache` for `ticket:{id}:comments`; invalidate on new comment — CACHE-2, CACHE-5
   - [x] ~~Auto-close scheduling: after assignee comment on non-terminal ticket, enqueue/replace delayed `auto-close:{ticketId}` job~~ — **removed from scope 2026-07-08; code still present, see Phase 8 cleanup item**
   - [x] ~~Creator reply: remove pending `auto-close:{ticketId}` job~~ — **removed from scope 2026-07-08; code still present, see Phase 8 cleanup item**
@@ -105,7 +105,7 @@ Traceable to `requirements.md`. Check off items as they are completed.
 - [x] `src/modules/comments/comment.routes.ts` — mounted under `tickets.routes.ts`
   - [x] `GET /:id/comments` (`authenticate`, `list`)
   - [x] `GET /:id/comments/:commentId` (`authenticate`, `getById`) — FR-9a
-  - [x] `POST /:id/comments` (`authenticate`, `upload.single('screenshot')`, validate message text, `add`) — multipart/form-data; screenshot is optional jpg/png file — FR-8, FR-8b
+  - [x] `POST /:id/comments` (`authenticate`, ~~`upload.single('screenshot')`~~ `uploadAttachmentFiles`, validate message text, `add`) — multipart/form-data — FR-8 — **switched from dedicated `comment.middleware.ts` (`upload.fields()` with a `screenshot` field) to the shared `uploadAttachmentFiles` from `attachment.middleware.ts` 2026-07-09; `comment.middleware.ts` deleted, see Phase 10 cleanup item**
 
 ---
 
@@ -113,7 +113,7 @@ Traceable to `requirements.md`. Check off items as they are completed.
 
 - [x] **Packages:** `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `sanitize-filename`, `mime-types`, `@types/sanitize-filename`, `@types/mime-types` — TS-9, FR-13c
 - [x] `src/storage/index.ts` — `StorageBackend` interface (`save(key, stream, mimeType, sizeBytes): Promise<void>`, `getStream`, `delete`); `buildStorageKey()` returns `YYYY-MM-DD/{uuid}`; factory (`getStorageBackend()`) selects backend from `STORAGE_BACKEND` env. `url` is not returned by the backend — it is derived in `attachment.service.ts`'s `toAttachmentUrl()` from the stored key — NFR-13
-- [x] `src/storage/local.ts` — saves to `{STORAGE_LOCAL_DIR}/{key}` (`STORAGE_LOCAL_DIR` defaults to `public`); served at `/{key}` via `express.static(config.storage.localDir)` — TS-9
+- [x] `src/storage/local.ts` — saves to `{STORAGE_LOCAL_DIR}/{key}` (`STORAGE_LOCAL_DIR` defaults to `public`); served at `/{key}` via `express.static(config.storage.localDir)` — TS-9 — **bug fix 2026-07-09: `toAttachmentUrl()` now prefixes `config.appUrl` (new `APP_URL` env var) so the returned `url` is absolute and opens directly in a browser, instead of a bare relative `/{key}` path; see Phase 10 cleanup item**
 - [x] `src/storage/s3.ts` — S3-compatible implementation (prod); returns S3 object URL as `url` — TS-9
 - [x] Mount `public/` as static in `src/app.ts` via `express.static(config.storage.localDir)` for local dev file serving — TS-9
 - [x] `src/modules/attachments/attachment.schemas.ts`
@@ -127,7 +127,7 @@ Traceable to `requirements.md`. Check off items as they are completed.
 - [x] Extend `comment.service.listComments()` (LEFT JOIN + `json_agg`, avoids N+1) and `getCommentById()` to include inline `attachments: AttachmentRow[]` per comment — FR-14
 - [x] Extend `POST /api/v1/tickets` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer; call `uploadAttachments()` after ticket insert — FR-13
 - [x] Extend `PATCH /api/v1/tickets/:id` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer; call `uploadAttachments()` on new files — FR-13
-- [x] Extend `POST /api/v1/tickets/:id/comments` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer alongside existing `screenshot` field; call `uploadAttachments()` with `commentId` — FR-13
+- [x] Extend `POST /api/v1/tickets/:id/comments` to accept optional PNG/JPG files via `uploadAttachments.array('files', maxFilesPerRequest)` multer ~~alongside existing `screenshot` field~~; call `uploadAttachments()` with `commentId` — FR-13 — **`screenshot` field removed 2026-07-09, see Phase 10 cleanup item**
 - [x] **No separate attachment endpoints** — no `/api/v1/attachments/*` routes; upload is part of ticket/comment mutation endpoints; access is through ticket/comment response bodies only
 - [x] Unit tests (`attachment.service.test.ts`) and TEST-9 integration coverage added to `ticket.controller.test.ts` / `comment.controller.test.ts` (upload success, disallowed MIME → 415, over-count → 400, inline attachments on GET, 403 for out-of-scope agent). Integration suites require a live Postgres/Redis to execute — not runnable in this sandbox (no Docker daemon); verified via `tsc --noEmit` and unit-test runs instead — TEST-9
 
@@ -185,7 +185,33 @@ Traceable to `requirements.md`. Check off items as they are completed.
   - [ ] Ticket detail (`GET /api/v1/tickets/:id`) includes inline `attachments` array with correct metadata + `url` — FR-14
   - [ ] Comment list/detail includes inline `attachments` array per comment — FR-14
   - [ ] Caller without parent-ticket access → `403` on ticket/comment endpoints — RBAC-3/4
-  - [ ] Uses `STORAGE_BACKEND=local` + `public/uploads` test directory; files cleaned up in `afterAll`
+  - [ ] Uses `STORAGE_BACKEND=local` + `STORAGE_LOCAL_DIR=.tmp/test-uploads` test directory; files cleaned up in `afterAll`
+
+---
+
+## Phase 10 — Bug Fixes & Screenshot Column Removal (CR)
+
+> **2026-07-09.** Two bugs reported against the tickets/attachments API, plus a change
+> request to drop the legacy `screenshot` string/file-upload columns now that the
+> `attachments` system (Phase 6) covers the same use case for both tickets and
+> comments. See `requirements.md` DM-13/DM-13a (removed), FR-8/FR-8b (updated),
+> TS-9/FR-13c/FR-15 (corrected).
+
+- [x] **Bug fix:** `GET /api/v1/tickets` (list) — `listTickets()` hardcoded `attachments: []` per ticket instead of fetching them; now maps each row through the same `withAttachments()` helper used by the other ticket endpoints — FR-14
+- [x] **Bug fix:** attachment `url` was a relative path (`/{storageKey}`) for the local storage backend, not directly openable in a browser — added `APP_URL` config (`src/config/index.ts`, default `http://localhost:{PORT}`) and updated `toAttachmentUrl()` (`attachment.service.ts`) to return `${config.appUrl}/${key}` — TS-9, FR-13c, FR-15
+- [x] **CR: remove `tickets.screenshot` and `comments.screenshot`** — both columns are superseded by the `attachments` system; removed in both DB and application code:
+  - [x] `src/db/schema.sql` — new dated migration block: `ALTER TABLE tickets DROP COLUMN IF EXISTS screenshot;` / `ALTER TABLE comments DROP COLUMN IF EXISTS screenshot;`
+  - [x] `ticket.schemas.ts` — removed `screenshot` from `createTicketSchema`, `updateTicketSchema`, `TicketRow`
+  - [x] `ticket.service.ts` — removed `screenshot` from `TicketDbRow`, `TICKET_SELECT`, `TICKET_RETURNING`, `withAttachments()`, `createTicket()` INSERT, `updateTicket()` set-clause branch
+  - [x] `ticket.routes.ts` / `swagger.ts` — removed `screenshot` from Swagger request/response schemas
+  - [x] `comment.schemas.ts` — removed `screenshot` from `createCommentSchema`'s doc comment and `CommentRow`
+  - [x] `comment.service.ts` — removed `ALLOWED_SCREENSHOT_MIMES`, `toScreenshotUrl()`, and all `screenshot` SQL/mapping; `addComment()` signature simplified from `(ticketId, message, file, attachmentFiles, callerId, callerRole)` to `(ticketId, message, files, callerId, callerRole)`
+  - [x] `comment.controller.ts` — `add()` now reads `req.files` as a flat array (same pattern as `ticket.controller.ts`) instead of destructuring multer `.fields()` output
+  - [x] `comment.routes.ts` — switched from `uploadCommentFiles` to the shared `uploadAttachmentFiles` (`attachment.middleware.ts`); removed `screenshot` from the Swagger multipart schema
+  - [x] Deleted `src/modules/comments/comment.middleware.ts` — redundant with `attachment.middleware.ts` once the dedicated `screenshot` multer field was removed
+  - [x] Test cleanup: removed `screenshot` fixtures/assertions from `ticket.service.test.ts`, `comment.service.test.ts` (including the dedicated screenshot-upload test), `comment.controller.test.ts` (including the screenshot-field MIME-rejection test, redundant with the existing `files`-field equivalent)
+  - [x] Docs: `requirements.md`, `.claude/plans/tickets-module.md`, `.claude/plans/comments-module.md`, `.claude/plans/attachments-module.md`, `README.md`, `CHANGELOG.md` updated/annotated
+  - [x] `.sample.env` — added `APP_URL`
 
 ---
 

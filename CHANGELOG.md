@@ -171,3 +171,40 @@ None
 None
 
 ---
+
+## 2026-07-09 — Bug Fixes: List Attachments & Absolute URLs; CR: Remove `screenshot` Columns
+
+**Branch:** main
+**Requirements:** `requirements.md` DM-13/DM-13a (removed), FR-8/FR-8b (updated), FR-14 (list endpoint), TS-9/FR-13c/FR-15 (corrected)
+
+### What was built
+Two bug fixes plus a change request:
+
+1. **Bug fix — `GET /api/v1/tickets` missing attachments.** `listTickets()` hardcoded `attachments: []` on every row instead of fetching them. Now maps each row through the same `withAttachments()` helper used by the other ticket endpoints, so list responses match detail responses.
+2. **Bug fix — attachment `url` not directly openable.** For the local storage backend, `toAttachmentUrl()` returned a bare relative path (`/{storageKey}`). Added a new `APP_URL` config var (default `http://localhost:{PORT}`) and updated `toAttachmentUrl()` to return `${APP_URL}/${storageKey}`, an absolute URL that opens directly in a browser. S3 URLs were already absolute and are unaffected.
+3. **CR — remove `tickets.screenshot` and `comments.screenshot`.** Both columns predated the `attachments` system and served the same purpose (linking an image to a ticket/comment) — `tickets.screenshot` as a plain client-supplied URL string, `comments.screenshot` as a single-file upload. Both are now redundant with the `attachments` system (multi-file, metadata-only in Postgres, bytes in the pluggable storage backend) and have been dropped in favor of it exclusively. Comment file uploads now go through the same `files` field / `uploadAttachmentFiles` middleware as ticket uploads; the dedicated `comment.middleware.ts` (which multiplexed a `screenshot` field alongside `files`) was deleted.
+
+### Files added / modified
+- `src/db/schema.sql` — new dated migration: `ALTER TABLE tickets DROP COLUMN IF EXISTS screenshot;` / `ALTER TABLE comments DROP COLUMN IF EXISTS screenshot;`
+- `src/config/index.ts` — added `appUrl` config field, sourced from `APP_URL` env var
+- `src/modules/attachments/attachment.service.ts` — `toAttachmentUrl()` now returns an absolute URL for the local backend
+- `src/modules/tickets/ticket.service.ts` — `listTickets()` now populates `attachments`; removed `screenshot` from `TicketDbRow`, `TICKET_SELECT`, `TICKET_RETURNING`, `withAttachments()`, `createTicket()`, `updateTicket()`
+- `src/modules/tickets/ticket.schemas.ts` — removed `screenshot` from `createTicketSchema`, `updateTicketSchema`, `TicketRow`
+- `src/modules/tickets/ticket.routes.ts` — removed `screenshot` from Swagger request schemas
+- `src/modules/comments/comment.schemas.ts` — removed `screenshot` from `CommentRow`
+- `src/modules/comments/comment.service.ts` — removed `ALLOWED_SCREENSHOT_MIMES`, `toScreenshotUrl()`, and all `screenshot` SQL/mapping; `addComment()` no longer takes a single-file `file` parameter, only a `files` array
+- `src/modules/comments/comment.controller.ts` — `add()` reads `req.files` as a flat array (same pattern as `ticket.controller.ts`)
+- `src/modules/comments/comment.routes.ts` — switched from `uploadCommentFiles` to the shared `uploadAttachmentFiles`; removed `screenshot` from the Swagger multipart schema
+- `src/modules/comments/comment.middleware.ts` — deleted (redundant with `attachment.middleware.ts`)
+- `src/config/swagger.ts` — removed `screenshot` from `TicketRow` and `CommentRow` component schemas
+- `.sample.env` — added `APP_URL`
+- Test files updated to match: `ticket.service.test.ts`, `comment.service.test.ts`, `comment.controller.test.ts`
+- `requirements.md`, `.claude/task.md`, `.claude/plans/tickets-module.md`, `.claude/plans/comments-module.md`, `.claude/plans/attachments-module.md`, `README.md` updated/annotated to match
+
+### New environment variables
+- `APP_URL` — base URL used to build absolute attachment URLs for the local storage backend; default `http://localhost:{PORT}`
+
+### Breaking changes
+**Yes.** `tickets.screenshot` and `comments.screenshot` are dropped from the database schema and from all request/response payloads (`TicketRow`, `CommentRow`). Clients that read or wrote these fields must migrate to the `attachments` system (`files` on upload, `attachments[]` on read). `POST /api/v1/tickets/:ticketId/comments` no longer accepts a `screenshot` multipart field — use `files` instead. Attachment `url` values for the local storage backend are now absolute instead of relative; clients that concatenated their own base URL onto a previously-relative `url` must stop doing so.
+
+---

@@ -52,7 +52,6 @@ const mockTicket = {
   description: 'Test description',
   type: null,
   subType: null,
-  screenshot: null,
   priority: 'MEDIUM' as const,
   status: 'OPEN' as const,
   assignedTo: ADMIN_ID,

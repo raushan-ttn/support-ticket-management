@@ -35,7 +35,6 @@ const router = Router();
  *               priority: { type: string, enum: [LOW, MEDIUM, HIGH, URGENT], default: MEDIUM }
  *               type: { type: string, maxLength: 100, example: BUG }
  *               subType: { type: string, maxLength: 100, example: AUTH }
- *               screenshot: { type: string, format: uri, description: URL of an existing screenshot }
  *               files:
  *                 type: array
  *                 items: { type: string, format: binary }
@@ -170,7 +169,6 @@ router.get('/:id', authenticate, controller.getById);
  *               priority: { type: string, enum: [LOW, MEDIUM, HIGH, URGENT] }
  *               type: { type: string, maxLength: 100, nullable: true }
  *               subType: { type: string, maxLength: 100, nullable: true }
- *               screenshot: { type: string, format: uri, nullable: true }
  *               files:
  *                 type: array
  *                 items: { type: string, format: binary }
