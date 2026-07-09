@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import authenticate from '../../middlewares/authenticate';
 import { validateBody } from '../../middlewares/validateBody';
-import { uploadCommentFiles } from './comment.middleware';
+import { uploadAttachmentFiles } from '../attachments/attachment.middleware';
 import * as controller from './comment.controller';
 import { createCommentSchema } from './comment.schemas';
 
@@ -28,7 +28,6 @@ const router = Router();
  *             required: [message]
  *             properties:
  *               message: { type: string, example: Looking into this now. }
- *               screenshot: { type: string, format: binary }
  *               files:
  *                 type: array
  *                 items: { type: string, format: binary }
@@ -57,12 +56,12 @@ const router = Router();
  *           application/json:
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  */
-// uploadCommentFiles must run before validateBody so req.files and multipart req.body
-// fields are available. It parses both the 'screenshot' and 'files' fields in one pass.
+// uploadAttachmentFiles must run before validateBody so req.files and multipart req.body
+// fields are available.
 router.post(
   '/:ticketId/comments',
   authenticate,
-  uploadCommentFiles,
+  uploadAttachmentFiles,
   validateBody(createCommentSchema),
   controller.add,
 );

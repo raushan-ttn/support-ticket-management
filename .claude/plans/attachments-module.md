@@ -2,6 +2,26 @@
 
 > **Requirements:** FR-13, FR-13a, FR-13b, FR-13c, FR-14, FR-15, FR-16, DM-8, DM-9, DM-10, DM-11, DM-12, DM-13, DM-13a, TS-9, VAL-6, RBAC-3, RBAC-4, CACHE-9, NFR-12, NFR-13, TEST-9
 > **Date:** 2026-07-08
+>
+> **Superseded (2026-07-09):**
+> 1. **`tickets.screenshot` / `comments.screenshot` (DM-13/DM-13a), referenced
+>    throughout this plan as a separate mechanism from `attachments`, have been
+>    **removed**. Comment file uploads now go exclusively through `uploadAttachmentFiles`
+>    (this module's middleware) — the dedicated `upload.single('screenshot')` /
+>    `toScreenshotUrl()` machinery this plan explicitly left untouched (see "Critical
+>    discrepancy #3" and the "Two multer instances on same route" risk note below) no
+>    longer exists; `comment.middleware.ts` has been deleted. See `task.md` Phase 10.
+> 2. **The local-URL bug this plan's "Decision" (Critical discrepancy #3) chose to
+>    accept** — `toAttachmentUrl()` returning a bare relative `/${key}` for the local
+>    backend — has been **fixed**. A new `APP_URL` config var (`src/config/index.ts`,
+>    default `http://localhost:{PORT}`) is now prepended, so `toAttachmentUrl()`
+>    returns an absolute URL that opens directly in a browser. See `requirements.md`
+>    TS-9/FR-13c/FR-15 and `task.md` Phase 10.
+> 3. **`GET /api/v1/tickets` (list) not embedding `attachments`** was a bug (not
+>    covered by this plan, which only planned the single-ticket `GET /:id` case) —
+>    fixed by mapping list rows through the same `withAttachments()` helper.
+>
+> Historical content below is left as-is for context.
 
 ---
 

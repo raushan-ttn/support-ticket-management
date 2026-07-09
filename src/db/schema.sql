@@ -168,3 +168,15 @@ ALTER TABLE comments ADD COLUMN IF NOT EXISTS screenshot TEXT;
 -- Indexes to support filtering and grouping tickets by classification.
 CREATE INDEX IF NOT EXISTS idx_tickets_type     ON tickets(type);
 CREATE INDEX IF NOT EXISTS idx_tickets_sub_type ON tickets(sub_type);
+
+-- =============================================================================
+-- Migration 2026-07-09: Drop screenshot columns from tickets and comments
+-- Requirements: DM-13, DM-13a (superseded — see requirements.md)
+-- Reason: the attachments system (files, metadata-only in Postgres, bytes in the
+-- storage backend) fully covers the plain-URL / single-file-upload use case that
+-- screenshot was added for. Two separate mechanisms for the same purpose is
+-- redundant, so the column is dropped in favor of attachments exclusively.
+-- =============================================================================
+
+ALTER TABLE tickets  DROP COLUMN IF EXISTS screenshot;
+ALTER TABLE comments DROP COLUMN IF EXISTS screenshot;

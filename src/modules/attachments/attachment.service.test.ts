@@ -1,3 +1,4 @@
+import config from '../../config';
 import { query } from '../../config/postgres';
 import { deleteCache, getCache, setCache } from '../../config/redis';
 import { buildStorageKey, getStorageBackend } from '../../storage';
@@ -64,8 +65,8 @@ beforeEach(() => {
 });
 
 describe('toAttachmentUrl', () => {
-  it('returns a root-relative path for the local backend', () => {
-    expect(toAttachmentUrl(STORAGE_KEY)).toBe(`/${STORAGE_KEY}`);
+  it('returns an absolute URL (APP_URL + key) for the local backend', () => {
+    expect(toAttachmentUrl(STORAGE_KEY)).toBe(`${config.appUrl}/${STORAGE_KEY}`);
   });
 });
 
@@ -114,7 +115,7 @@ describe('uploadAttachments', () => {
     expect(mockSave).toHaveBeenCalledWith(STORAGE_KEY, expect.anything(), 'image/png', 1234);
     expect(result).toHaveLength(1);
     expect(result[0]).not.toHaveProperty('storageKey');
-    expect(result[0].url).toBe(`/${STORAGE_KEY}`);
+    expect(result[0].url).toBe(`${config.appUrl}/${STORAGE_KEY}`);
     expect(mockDeleteCache).toHaveBeenCalledWith(`ticket:${TICKET_ID}:attachments`);
   });
 
@@ -218,7 +219,7 @@ describe('getAttachmentsByTicket', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).not.toHaveProperty('storageKey');
-    expect(result[0].url).toBe(`/${STORAGE_KEY}`);
+    expect(result[0].url).toBe(`${config.appUrl}/${STORAGE_KEY}`);
     expect(mockSetCache).toHaveBeenCalledWith(
       `ticket:${TICKET_ID}:attachments`,
       result,

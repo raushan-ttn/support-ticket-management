@@ -67,7 +67,6 @@ describe('POST /api/v1/tickets/:ticketId/comments', () => {
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.data.message).toBe('Hello from admin');
-    expect(res.body.data.screenshot).toBeNull();
     expect(res.body.data.ticketId).toBe(ticket.id);
     expect(res.body.data.createdBy).toBe(admin.id);
     // storageKey must never appear in the response
@@ -133,19 +132,6 @@ describe('POST /api/v1/tickets/:ticketId/comments', () => {
       .field('message', 'sneaky comment');
 
     expect(res.status).toBe(403);
-  });
-
-  it('rejects unsupported file MIME type with 415', async () => {
-    const admin = await createUser('Admin', 'admin@test.com', 'ADMIN');
-    const ticket = await createTicketInDb(admin.token, admin.id);
-
-    const res = await request(app)
-      .post(`/api/v1/tickets/${ticket.id}/comments`)
-      .set('Authorization', `Bearer ${admin.token}`)
-      .field('message', 'with bad file')
-      .attach('screenshot', Buffer.from('fake pdf'), { filename: 'doc.pdf', contentType: 'application/pdf' });
-
-    expect(res.status).toBe(415);
   });
 
   // TEST-9: comment-level attachments

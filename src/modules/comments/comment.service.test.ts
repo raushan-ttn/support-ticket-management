@@ -1,7 +1,6 @@
 import { query } from '../../config/postgres';
 import { deleteCache, getCache, setCache } from '../../config/redis';
 import { sendCommentNotificationEmail } from '../../jobs/notifications';
-import { buildStorageKey, getStorageBackend } from '../../storage';
 import { getTicketById } from '../tickets/ticket.service';
 import { addComment, getCommentById, listComments } from './comment.service';
 
@@ -17,11 +16,6 @@ jest.mock('../../config/redis', () => ({
 
 jest.mock('../../jobs/notifications', () => ({
   sendCommentNotificationEmail: jest.fn(),
-}));
-
-jest.mock('../../storage', () => ({
-  buildStorageKey: jest.fn(),
-  getStorageBackend: jest.fn(),
 }));
 
 jest.mock('../tickets/ticket.service', () => ({ getTicketById: jest.fn() }));
@@ -41,8 +35,6 @@ const mockDeleteCache = deleteCache as jest.MockedFunction<typeof deleteCache>;
 const mockSendCommentNotificationEmail = sendCommentNotificationEmail as jest.MockedFunction<
   typeof sendCommentNotificationEmail
 >;
-const mockBuildStorageKey = buildStorageKey as jest.MockedFunction<typeof buildStorageKey>;
-const mockGetStorageBackend = getStorageBackend as jest.MockedFunction<typeof getStorageBackend>;
 const mockGetTicketById = getTicketById as jest.MockedFunction<typeof getTicketById>;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -58,7 +50,6 @@ const mockTicket = {
   description: 'Test description',
   type: null,
   subType: null,
-  screenshot: null,
   priority: 'MEDIUM' as const,
   status: 'OPEN' as const,
   assignedTo: AGENT_ID,
@@ -72,7 +63,6 @@ const mockCommentRow = {
   id: COMMENT_ID,
   ticketId: TICKET_ID,
   message: 'This is a comment',
-  screenshot: null,
   createdBy: AGENT_ID,
   createdByName: 'Agent User',
   createdAt: new Date().toISOString(),
@@ -91,62 +81,16 @@ beforeEach(() => {
 // ── addComment ─────────────────────────────────────────────────────────────────
 
 describe('addComment', () => {
-  it('inserts comment without screenshot and returns CommentRow', async () => {
+  it('inserts comment and returns CommentRow', async () => {
     // admin lookup for queue payload
     mockQuery
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never) // CTE insert+select
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never); // admin lookup
 
-    const result = await addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT');
+    const result = await addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT');
 
     expect(result).toMatchObject({ id: COMMENT_ID, message: 'This is a comment' });
     expect(mockDeleteCache).toHaveBeenCalledWith(`ticket:${TICKET_ID}:comments`);
-  });
-
-  it('throws 415 when file has disallowed MIME type', async () => {
-    const badFile = {
-      mimetype: 'text/plain',
-      buffer: Buffer.from('hello'),
-      size: 5,
-    } as Express.Multer.File;
-
-    await expect(
-      addComment(TICKET_ID, 'hello', badFile, undefined, AGENT_ID, 'AGENT'),
-    ).rejects.toMatchObject({ statusCode: 415, code: 'UNSUPPORTED_MEDIA_TYPE' });
-  });
-
-  it('saves screenshot and stores key in DB when file is jpeg', async () => {
-    const storageKey = '2026-07-01/test-uuid';
-    const mockSave = jest.fn().mockResolvedValue(undefined);
-    mockBuildStorageKey.mockReturnValue(storageKey);
-    mockGetStorageBackend.mockResolvedValue({ save: mockSave } as never);
-
-    const fileWithScreenshot = {
-      mimetype: 'image/jpeg',
-      buffer: Buffer.from('jpeg-data'),
-      size: 9,
-    } as Express.Multer.File;
-
-    const commentWithScreenshot = { ...mockCommentRow, screenshot: storageKey };
-    mockQuery
-      .mockResolvedValueOnce({ rows: [commentWithScreenshot], rowCount: 1 } as never)
-      .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
-
-    const result = await addComment(
-      TICKET_ID,
-      'Comment with screenshot',
-      fileWithScreenshot,
-      undefined,
-      AGENT_ID,
-      'AGENT',
-    );
-
-    expect(mockSave).toHaveBeenCalledWith(storageKey, expect.anything(), 'image/jpeg', 9);
-    // screenshot URL is the public URL derived from storage key (not the raw key)
-    expect(result.screenshot).toContain(storageKey);
-    // Verify storage key is passed to DB insert as $3
-    const insertCall = mockQuery.mock.calls[0];
-    expect(insertCall[1]?.[2]).toBe(storageKey);
   });
 
   it('sends comment-notification email with correct payload', async () => {
@@ -154,7 +98,7 @@ describe('addComment', () => {
       .mockResolvedValueOnce({ rows: [mockCommentRow], rowCount: 1 } as never)
       .mockResolvedValueOnce({ rows: [{ id: ADMIN_ID }], rowCount: 1 } as never);
 
-    await addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT');
+    await addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT');
 
     expect(mockSendCommentNotificationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ ticketId: TICKET_ID, commentAuthorId: AGENT_ID }),
@@ -169,7 +113,7 @@ describe('addComment', () => {
 
     // Should resolve normally despite notification failure
     await expect(
-      addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT'),
     ).resolves.toMatchObject({ id: COMMENT_ID });
   });
 
@@ -177,7 +121,7 @@ describe('addComment', () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
 
     await expect(
-      addComment(TICKET_ID, 'This is a comment', undefined, undefined, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'This is a comment', undefined, AGENT_ID, 'AGENT'),
     ).rejects.toMatchObject({ statusCode: 500 });
   });
 
@@ -186,7 +130,7 @@ describe('addComment', () => {
     mockGetTicketById.mockRejectedValue(forbidden);
 
     await expect(
-      addComment(TICKET_ID, 'hello', undefined, undefined, AGENT_ID, 'AGENT'),
+      addComment(TICKET_ID, 'hello', undefined, AGENT_ID, 'AGENT'),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 });

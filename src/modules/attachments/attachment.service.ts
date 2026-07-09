@@ -17,7 +17,8 @@ function createHttpError(message: string, statusCode: number, code?: string): Er
 
 /**
  * Compute the public URL for a stored file.
- * For local: /${key} — served by express.static(config.storage.localDir)
+ * For local: {APP_URL}/${key} — absolute so it opens directly in a browser;
+ *   served by express.static(config.storage.localDir)
  * For S3: https://{bucket}.s3.{region}.amazonaws.com/{key} (or custom endpoint)
  */
 export function toAttachmentUrl(key: string): string {
@@ -26,7 +27,7 @@ export function toAttachmentUrl(key: string): string {
     const base = endpoint ?? `https://${bucket}.s3.${region}.amazonaws.com`;
     return `${base}/${key}`;
   }
-  return `/${key}`;
+  return `${config.appUrl}/${key}`;
 }
 
 function toAttachmentRow(db: AttachmentDbRow): AttachmentRow {

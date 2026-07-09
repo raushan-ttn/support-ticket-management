@@ -22,7 +22,6 @@ interface TicketDbRow {
   description: string;
   type: string | null;
   subType: string | null;
-  screenshot: string | null;
   priority: string;
   status: string;
   assignedTo: string;
@@ -58,7 +57,6 @@ const TICKET_SELECT = `
   t.description,
   t.type,
   t.sub_type AS "subType",
-  t.screenshot,
   t.priority,
   t.status,
   t.assigned_to AS "assignedTo",
@@ -74,7 +72,6 @@ const TICKET_RETURNING = `
   description,
   type,
   sub_type AS "subType",
-  screenshot,
   priority,
   status,
   assigned_to AS "assignedTo",
@@ -102,7 +99,6 @@ async function withAttachments(dbRow: TicketDbRow): Promise<TicketRow> {
     description: dbRow.description,
     type: dbRow.type,
     subType: dbRow.subType,
-    screenshot: dbRow.screenshot,
     priority: dbRow.priority as TicketRow['priority'],
     status: dbRow.status as TicketRow['status'],
     assignedTo: dbRow.assignedTo,
@@ -136,15 +132,14 @@ export async function createTicket(
   const adminId = adminResult.rows[0].id;
 
   const insertResult = await query<{ id: string }>(
-    `INSERT INTO tickets (title, description, type, sub_type, screenshot, priority, status, assigned_to, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', $7, $8)
+    `INSERT INTO tickets (title, description, type, sub_type, priority, status, assigned_to, created_by)
+     VALUES ($1, $2, $3, $4, $5, 'OPEN', $6, $7)
      RETURNING id`,
     [
       payload.title,
       payload.description,
       payload.type ?? null,
       payload.subType ?? null,
-      payload.screenshot ?? null,
       payload.priority,
       adminId,
       creatorId,
@@ -246,22 +241,7 @@ export async function listTickets(
     params,
   );
 
-  // List endpoint returns tickets without inline attachments (only GET /:id embeds them)
-  const tickets: TicketRow[] = ticketsResult.rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    type: row.type,
-    subType: row.subType,
-    screenshot: row.screenshot,
-    priority: row.priority as TicketRow['priority'],
-    status: row.status as TicketRow['status'],
-    assignedTo: row.assignedTo,
-    createdBy: row.createdBy,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    attachments: [],
-  }));
+  const tickets: TicketRow[] = await Promise.all(ticketsResult.rows.map(withAttachments));
 
   return { tickets, total, page, limit };
 }
@@ -356,10 +336,6 @@ export async function updateTicket(
     if (payload.subType !== undefined) {
       params.push(payload.subType);
       setClauses.push(`sub_type = $${params.length}`);
-    }
-    if (payload.screenshot !== undefined) {
-      params.push(payload.screenshot);
-      setClauses.push(`screenshot = $${params.length}`);
     }
 
     if (setClauses.length === 0)

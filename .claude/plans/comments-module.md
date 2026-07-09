@@ -13,6 +13,14 @@
 > Phase 7/8. The rest of this document (schema, endpoints, RBAC, caching) remains
 > accurate as historical record of what was built; only the queue/auto-close portions
 > below are obsolete.
+>
+> **Further superseded (2026-07-09):** the `comments.screenshot` column and its
+> single-file-upload handling (`toScreenshotUrl()`, `upload.single('screenshot')`,
+> DM-13a) described throughout this plan have also been **removed** — comment file
+> uploads now go exclusively through the `attachments` system (`files` field,
+> shared `uploadAttachmentFiles` middleware), same as tickets. See `task.md` Phase 10
+> and `requirements.md` DM-13a. `comment.middleware.ts` (created by this plan) has
+> been deleted. Historical content below is left as-is for context.
 
 ---
 

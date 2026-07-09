@@ -11,7 +11,6 @@ export const createTicketSchema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   type: z.string().trim().max(100).optional(),
   subType: z.string().trim().max(100).optional(),
-  screenshot: z.string().url({ message: 'screenshot must be a valid URL' }).optional(),
 });
 
 export const updateTicketSchema = z
@@ -21,11 +20,6 @@ export const updateTicketSchema = z
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
     type: z.string().trim().max(100).nullable().optional(),
     subType: z.string().trim().max(100).nullable().optional(),
-    screenshot: z
-      .string()
-      .url({ message: 'screenshot must be a valid URL' })
-      .nullable()
-      .optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' });
 
@@ -61,7 +55,6 @@ export interface TicketRow {
   description: string;
   type: string | null;
   subType: string | null;
-  screenshot: string | null;
   priority: TicketPriority;
   status: TicketStatus;
   assignedTo: string;
