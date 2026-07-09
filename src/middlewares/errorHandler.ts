@@ -7,6 +7,8 @@ import { error } from '../utils/response';
 interface AppError extends Error {
   statusCode?: number;
   code?: string;
+  /** Extra top-level response body fields (e.g. { from, to } for SM-2 transition errors). */
+  extra?: Record<string, unknown>;
 }
 
 const errorHandler = (
@@ -48,10 +50,17 @@ const errorHandler = (
         : err.message;
 
   const code = (err as AppError).code;
+  const rawExtra = (err as AppError).extra;
+  const RESERVED_KEYS = new Set(['success', 'message', 'code', 'stack']);
+  const extra =
+    rawExtra !== undefined
+      ? Object.fromEntries(Object.entries(rawExtra).filter(([key]) => !RESERVED_KEYS.has(key)))
+      : undefined;
   res.status(statusCode).json({
     success: false,
     message,
     ...(code !== undefined && { code }),
+    ...(extra !== undefined && extra),
     ...(config.env === 'development' && { stack: err.stack }),
   });
 };

@@ -61,8 +61,10 @@ Interactive API documentation is available via **Swagger UI** at `GET /api-docs`
 | `POST` | `/api/v1/tickets/:ticketId/comments` | Add comment to ticket with optional comment-level attachments (`files`, image/jpeg or image/png, multipart/form-data) |
 | `GET` | `/api/v1/tickets/:ticketId/comments` | List ticket comments ordered by creation time, each with an inline `attachments` array; RBAC-scoped; Redis-cached |
 | `GET` | `/api/v1/tickets/:ticketId/comments/:commentId` | Fetch single comment by ID, including inline `attachments` array; RBAC-scoped |
+| `GET` | `/api/v1/tickets/:ticketId/attachments/:attachmentId/download` | Download attachment file; streams with correct `Content-Type` and `Content-Disposition` headers; RBAC-scoped to ADMIN or ticket-accessible AGENT |
+| `DELETE` | `/api/v1/tickets/:ticketId/attachments/:attachmentId` | Delete attachment; RBAC: ADMIN can delete any, AGENT can delete only own uploads |
 
-There are no standalone `/api/v1/attachments/*` endpoints — attachments are uploaded as part of the ticket/comment mutation endpoints above and accessed via the `url` field embedded in ticket/comment responses (served directly from the storage backend; local dev via `express.static`, S3 via object URL in prod).
+There are no standalone `/api/v1/attachments/*` endpoints (except download/delete under tickets) — attachments are uploaded as part of the ticket/comment mutation endpoints above and accessed via the `url` field embedded in ticket/comment responses (served directly from the storage backend; local dev via `express.static`, S3 via object URL in prod).
 
 ## Environment Variables
 

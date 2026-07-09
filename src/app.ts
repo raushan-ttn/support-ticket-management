@@ -11,6 +11,7 @@ import config from './config';
 import passport from './config/passport';
 import swaggerSpec from './config/swagger';
 import errorHandler from './middlewares/errorHandler';
+import attachmentRouter from './modules/attachments/attachment.routes';
 import authRoutes from './modules/auth/auth.routes';
 import commentsRouter from './modules/comments/comment.routes';
 import ticketRoutes from './modules/tickets/ticket.routes';
@@ -73,6 +74,7 @@ app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/tickets', ticketRoutes);
 app.use('/api/v1/tickets', commentsRouter);
+app.use('/api/v1/tickets/:ticketId/attachments', attachmentRouter);
 
 app.use(errorHandler);
 

@@ -78,6 +78,29 @@ beforeEach(() => {
   mockSendCommentNotificationEmail.mockResolvedValue(undefined);
 });
 
+// ── createCommentSchema validation (TEST-5) ────────────────────────────────────
+
+describe('createCommentSchema validation', () => {
+  const { createCommentSchema } = jest.requireActual(
+    './comment.schemas',
+  ) as typeof import('./comment.schemas');
+
+  it('rejects an empty string message', () => {
+    const result = createCommentSchema.safeParse({ message: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a whitespace-only message', () => {
+    const result = createCommentSchema.safeParse({ message: '   ' });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a valid non-empty message', () => {
+    const result = createCommentSchema.safeParse({ message: 'Hello world' });
+    expect(result.success).toBe(true);
+  });
+});
+
 // ── addComment ─────────────────────────────────────────────────────────────────
 
 describe('addComment', () => {

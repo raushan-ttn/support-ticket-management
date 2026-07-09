@@ -6,6 +6,6 @@
     "ignoreDeprecations": "6.0",
     "types": ["jest", "node"]
   },
-  "include": ["src/**/*", "bin/**/*", "jest.setup.ts"],
+  "include": ["src/**/*", "bin/**/*", "jest.setup.ts", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }

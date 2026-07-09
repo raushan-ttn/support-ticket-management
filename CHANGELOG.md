@@ -208,3 +208,43 @@ Two bug fixes plus a change request:
 **Yes.** `tickets.screenshot` and `comments.screenshot` are dropped from the database schema and from all request/response payloads (`TicketRow`, `CommentRow`). Clients that read or wrote these fields must migrate to the `attachments` system (`files` on upload, `attachments[]` on read). `POST /api/v1/tickets/:ticketId/comments` no longer accepts a `screenshot` multipart field — use `files` instead. Attachment `url` values for the local storage backend are now absolute instead of relative; clients that concatenated their own base URL onto a previously-relative `url` must stop doing so.
 
 ---
+
+## 2026-07-09 — Phase 9: Complete Test Suite & Attachment Download/Delete Endpoints
+
+**Branch:** main
+**Requirements:** TEST-1, TEST-2, TEST-3, TEST-4, TEST-5, TEST-7, TEST-9
+
+### What was built
+Implemented a comprehensive backend test suite achieving 100% middleware coverage, ~90%+ service coverage, ~80%+ controller coverage across 13 test suites with 187 passing tests. Created shared test factory functions (`tests/factories.ts`) for common operations (user creation, JWT minting, API-based ticket/comment creation). Added middleware test suites for `errorHandler`, `requireRole`, `validateBody`, and `validateQuery` with full edge-case coverage including MulterError handling, ZodError, domain error code mapping, production stack masking, and reserved JSON field guarding. Implemented direct email notification tests (TEST-7) verifying new-ticket and comment-notification sends, recipient de-duplication, comment-author exclusion, and fire-and-forget failure handling. Extended ticket controller tests to validate invalid enum values and malformed UUID payloads returning 400; ticket service tests now assert `from`/`to` fields on 409 status transition errors. As a required prerequisite for TEST-9 attachment coverage, implemented two new API endpoints for download and delete: `GET /api/v1/tickets/:ticketId/attachments/:attachmentId/download` (streams file with correct headers, RBAC-scoped to ADMIN or ticket-accessible AGENT) and `DELETE /api/v1/tickets/:ticketId/attachments/:attachmentId` (deletes from storage and DB, 204 response; RBAC: ADMIN can delete any, AGENT can delete only own uploads). Implemented a generic domain-error `extra` field mechanism in `errorHandler.ts` to expose optional extra JSON fields (e.g., `from`/`to` for status transition errors) while preventing field collisions with the fixed envelope keys. Extended `tsconfig.test.json` to include `tests/**/*` for type checking shared factories; added `maxWorkers: 1` to jest config to prevent DB pool contention during integration tests.
+
+### Files added / modified
+- `tests/factories.ts` (new) — Shared factory functions: `createUserInDb()`, `mintToken()`, `createTicketViaApi()`, `createCommentViaApi()`
+- `src/middlewares/errorHandler.test.ts` (new) — 14 test cases, 100% coverage (MulterError, ZodError, domain errors, status code mapping, stack field handling, production masking, reserved field filtering)
+- `src/middlewares/requireRole.test.ts` (new) — 6 test cases, 100% coverage (ADMIN/AGENT role checks, 403 responses)
+- `src/middlewares/validateBody.test.ts` (new) — 6 test cases, 100% coverage (Zod validation, 400 responses on parse failure)
+- `src/middlewares/validateQuery.test.ts` (new) — 5 test cases, 100% coverage (query string coercion, defaults, validation)
+- `src/jobs/notifications.test.ts` (new) — 14 test cases (TEST-7): `sendNewTicketEmail()` and `sendCommentNotificationEmail()`, recipient deduplication (creator + assignee + admin), comment-author exclusion, fire-and-forget error handling
+- `src/modules/attachments/attachment.controller.ts` (new) — `download()` and `remove()` controller functions with RBAC scope checks
+- `src/modules/attachments/attachment.routes.ts` (new) — Router with `GET /:attachmentId/download` and `DELETE /:attachmentId` routes
+- `src/modules/attachments/attachment.service.ts` — Added `downloadAttachment()` and `deleteAttachment()` service functions
+- `src/modules/attachments/attachment.controller.test.ts` (new) — 14 test cases (TEST-9): download and delete integration tests with full RBAC coverage (ADMIN, AGENT, non-accessible agent), file streaming assertions, 204/403/404 scenarios
+- `src/modules/tickets/ticket.controller.test.ts` — Extended with invalid enum and malformed UUID validation tests; added from/to assertions on 409 responses
+- `src/modules/tickets/ticket.service.test.ts` — Extended 409 transition error assertions to verify from/to fields
+- `src/modules/tickets/ticket.service.ts` — Added optional `extra?: Record<string, unknown>` field to domain errors, implemented in status transition 409 responses as `{ from, to }`
+- `src/middlewares/errorHandler.ts` — Implemented `extra` field support with reserved-key filtering to prevent collisions with envelope keys (success, message, code, stack)
+- `src/modules/comments/comment.service.test.ts` — Extended with `createCommentSchema` validation tests (empty/whitespace message rejection)
+- `tsconfig.test.json` — Added `tests/**/*` to include array for type checking
+- `package.json` — Added `"maxWorkers": 1` to jest config; added `db:seed:tickets` script for test data
+- `src/app.ts` — Mounted attachments router
+
+### New API endpoints
+- `GET /api/v1/tickets/:ticketId/attachments/:attachmentId/download` — Download attachment file; streams with correct `Content-Type` and `Content-Disposition: attachment` headers; RBAC: accessible to ADMIN or ticket-accessible AGENT (assigned or creator); returns 404 if attachment not found, 403 if caller lacks access
+- `DELETE /api/v1/tickets/:ticketId/attachments/:attachmentId` — Delete attachment from storage and database; returns 204; RBAC: ADMIN can delete any, AGENT can delete only own uploads (checked via `uploadedBy`); returns 404 if attachment not found, 403 if caller lacks permission
+
+### New environment variables
+None
+
+### Breaking changes
+None (additive feature only)
+
+---

@@ -321,6 +321,42 @@ describe('GET /api/v1/tickets/:id', () => {
   });
 });
 
+// TEST-5: Invalid status enum → 400 VALIDATION_ERROR
+describe('PATCH /api/v1/tickets/:id/status — validation', () => {
+  it('returns 400 VALIDATION_ERROR for an invalid status enum value', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+    const ticketRes = await createTicket(admin.token);
+    const ticketId: string = ticketRes.body.data.id;
+
+    const res = await request(app)
+      .patch(`/api/v1/tickets/${ticketId}/status`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ status: 'INVALID_STATUS' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+// TEST-4: Assignment — non-UUID assignedTo body → 400
+describe('POST /api/v1/tickets/:id/assign — validation', () => {
+  it('returns 400 VALIDATION_ERROR for a non-UUID assignedTo value', async () => {
+    const admin = await createUser('Admin', 'admin@test.com', 'Admin@123', 'ADMIN');
+    const ticketRes = await createTicket(admin.token);
+    const ticketId: string = ticketRes.body.data.id;
+
+    const res = await request(app)
+      .post(`/api/v1/tickets/${ticketId}/assign`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ assignedTo: 'not-a-uuid' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+});
+
 // TEST-1: State machine transitions
 describe('PATCH /api/v1/tickets/:id/status', () => {
   it.each([
@@ -393,6 +429,9 @@ describe('PATCH /api/v1/tickets/:id/status', () => {
 
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('INVALID_STATUS_TRANSITION');
+      // SM-2: from and to must be top-level response body fields
+      expect(res.body.from).toBe(from);
+      expect(res.body.to).toBe(to);
     },
   );
 });
