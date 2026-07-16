@@ -4,14 +4,14 @@ This document describes how we use AI (primarily **Claude Code**) across the ful
 
 | Phase | AI Role | Primary Artifacts |
 |-------|---------|-------------------|
-| Context | Persistent project memory | [`CLAUDE.md`](../CLAUDE.md), [`.claude/rules/`](rules/) |
-| Requirements | Edge-case discovery, acceptance criteria | [`.claude/requirements.md`](requirements.md), `.claude/plans/{feature}.md` |
-| Planning | Architecture and file-level design | [`.claude/plans/`](plans/) |
+| Context | Persistent project memory | [`CLAUDE.md`](CLAUDE.md), [`.claude/rules/`](.claude/rules/) |
+| Requirements | Edge-case discovery, acceptance criteria | [`.claude/requirements.md`](.claude/requirements.md), `.claude/plans/{feature}.md` |
+| Planning | Architecture and file-level design | [`.claude/plans/`](.claude/plans/) |
 | Code generation | Module scaffolding, business logic | `src/modules/{module}/`, `src/jobs/`, `src/storage/` |
-| Validation | Lint, type-check, manual Non-Negotiables | ESLint, Prettier, Husky, `tsc`, [`.claude/settings.json`](settings.json) |
-| Testing | Unit + integration test generation | [`.claude/rules/api-conventions.md`](rules/api-conventions.md#testing) |
+| Validation | Lint, type-check, manual Non-Negotiables | ESLint, Prettier, Husky, `tsc`, [`.claude/settings.json`](.claude/settings.json) |
+| Testing | Unit + integration test generation | [`.claude/rules/api-conventions.md`](.claude/rules/api-conventions.md#testing) |
 | Debugging | Root-cause analysis, minimal fixes | Error stacks + `CLAUDE.md` |
-| Code review | Pre-review checklist against rules | [`.claude/rules/`](rules/) |
+| Code review | Pre-review checklist against rules | [`.claude/rules/`](.claude/rules/) |
 | Security | Data boundary enforcement | `.sample.env` only — never `.env` |
 
 ---
@@ -22,11 +22,11 @@ This document describes how we use AI (primarily **Claude Code**) across the ful
 
 | Artifact | Purpose |
 |----------|---------|
-| [`CLAUDE.md`](../CLAUDE.md) | Single source of truth — stack, architecture, Non-Negotiables, env vars, scripts. Loaded automatically at the start of every Claude Code session. |
-| [`.claude/requirements.md`](requirements.md) | Full backend requirements (data model, endpoints, state machine, RBAC, notifications, attachments). |
-| [`.claude/rules/`](rules/) | Persistent coding standards (TypeScript, API design, database, security, testing). |
-| [`.claude/plans/`](plans/) | Architectural decisions and feature plans — the "why" behind prior work. |
-| [`.claude/settings.json`](settings.json) | Project-level Claude Code configuration — permissions and automation hooks. |
+| [`CLAUDE.md`](CLAUDE.md) | Single source of truth — stack, architecture, Non-Negotiables, env vars, scripts. Loaded automatically at the start of every Claude Code session. |
+| [`.claude/requirements.md`](.claude/requirements.md) | Full backend requirements (data model, endpoints, state machine, RBAC, notifications, attachments). |
+| [`.claude/rules/`](.claude/rules/) | Persistent coding standards (TypeScript, API design, database, security, testing). |
+| [`.claude/plans/`](.claude/plans/) | Architectural decisions and feature plans — the "why" behind prior work. |
+| [`.claude/settings.json`](.claude/settings.json) | Project-level Claude Code configuration — permissions and automation hooks. |
 
 Claude Code operates in the project directory and reads `CLAUDE.md` plus `.claude/` files to stay aligned with project conventions without re-explaining the stack each session.
 
@@ -125,7 +125,7 @@ Constraints: follow Non-Negotiables in CLAUDE.md and .claude/rules/
 - `CLAUDE.md` documents all env var **defaults** — Claude never needs the real `.env`.
 - `.claude/requirements.md` is the canonical spec — reference it instead of re-stating requirements in prompts.
 - `.claude/rules/` encodes decisions that would otherwise be repeated every session.
-- `.claude/plans/` preserves rationale (e.g. why ESLint v10 flat config was chosen in [`backend-tooling.md`](plans/backend-tooling.md)).
+- `.claude/plans/` preserves rationale (e.g. why ESLint v10 flat config was chosen in [`backend-tooling.md`](.claude/plans/backend-tooling.md)).
 
 ---
 
@@ -207,14 +207,14 @@ Do not write code yet.
 
 | Plan | Scope |
 |------|-------|
-| [`backend-tooling.md`](plans/backend-tooling.md) | TypeScript migration, ESLint, Prettier, Husky |
-| [`backend-database.md`](plans/backend-database.md) | PostgreSQL pool, Redis, lifecycle |
-| [`backend-schema.md`](plans/backend-schema.md) | `users`, `tickets`, `comments` DDL |
-| [`auth-validation-upload.md`](plans/auth-validation-upload.md) | Zod, Passport, Multer, security middleware |
-| [`schema-alignment.md`](plans/schema-alignment.md) | ENUM casing fixes, `CANCELLED`/`URGENT`, `NOT NULL`, `attachments` table |
-| [`tickets-module.md`](plans/tickets-module.md) | Tickets CRUD, state machine, RBAC, comments, search/filter |
-| [`notifications-email.md`](plans/notifications-email.md) | Direct (non-queued) SMTP email notifications; auto-close removed from scope |
-| [`attachments-module.md`](plans/attachments-module.md) | File upload/download/delete, storage abstraction (local + S3) |
+| [`backend-tooling.md`](.claude/plans/backend-tooling.md) | TypeScript migration, ESLint, Prettier, Husky |
+| [`backend-database.md`](.claude/plans/backend-database.md) | PostgreSQL pool, Redis, lifecycle |
+| [`backend-schema.md`](.claude/plans/backend-schema.md) | `users`, `tickets`, `comments` DDL |
+| [`auth-validation-upload.md`](.claude/plans/auth-validation-upload.md) | Zod, Passport, Multer, security middleware |
+| [`schema-alignment.md`](.claude/plans/schema-alignment.md) | ENUM casing fixes, `CANCELLED`/`URGENT`, `NOT NULL`, `attachments` table |
+| [`tickets-module.md`](.claude/plans/tickets-module.md) | Tickets CRUD, state machine, RBAC, comments, search/filter |
+| [`notifications-email.md`](.claude/plans/notifications-email.md) | Direct (non-queued) SMTP email notifications; auto-close removed from scope |
+| [`attachments-module.md`](.claude/plans/attachments-module.md) | File upload/download/delete, storage abstraction (local + S3) |
 
 ### Requirements-to-plan gap checklist
 
@@ -357,7 +357,7 @@ Fix these errors. Minimal change only. Follow CLAUDE.md Non-Negotiables.
 
 ## 7. AI for Testing
 
-Testing strategy is defined in the Testing section of [`.claude/rules/api-conventions.md`](rules/api-conventions.md#testing).
+Testing strategy is defined in the Testing section of [`.claude/rules/api-conventions.md`](.claude/rules/api-conventions.md#testing).
 
 ### Stack
 
@@ -559,7 +559,7 @@ This workflow is portable. To adopt it on a new Node/Express (or similar) projec
 
 ```
 CLAUDE.md
-.claude/workflow.md                  ← this document
+.claude/workflow.md                  ← this document (this repo keeps its copy at root: tool-workflow.md)
 .claude/requirements.md              ← replace with your project's requirements
 .claude/rules/
 .claude/settings.json                ← update allowed scripts to match your package.json
@@ -594,7 +594,7 @@ CLAUDE.md
 
 ### Scaling to a team
 
-- **Onboarding:** New developers read `CLAUDE.md` + `.claude/workflow.md` + `.claude/requirements.md` on day one.
+- **Onboarding:** New developers read `CLAUDE.md` + `tool-workflow.md` + `.claude/requirements.md` on day one.
 - **Consistency:** All AI sessions reference the same rules — output stays aligned across contributors.
 - **Auditability:** Plans in `.claude/plans/` document why decisions were made, not just what was built.
 - **Security:** Team agreement on Section 10 boundaries — no secrets in prompts, ever.
@@ -605,10 +605,10 @@ CLAUDE.md
 
 | File | Role |
 |------|------|
-| [`CLAUDE.md`](../CLAUDE.md) | Project context for every AI session |
-| [`.claude/requirements.md`](requirements.md) | Full backend requirements spec |
-| [`.claude/workflow.md`](workflow.md) | This document — AI workflow across the SDLC |
-| [`.claude/settings.json`](settings.json) | Claude Code permissions and automation hooks |
-| [`.claude/rules/`](rules/) | Persistent coding and security standards |
-| [`.claude/plans/`](plans/) | Feature and architecture decision records |
-| [`.sample.env`](../.sample.env) | Safe env template for local setup |
+| [`CLAUDE.md`](CLAUDE.md) | Project context for every AI session |
+| [`.claude/requirements.md`](.claude/requirements.md) | Full backend requirements spec |
+| [`tool-workflow.md`](tool-workflow.md) | This document — AI workflow across the SDLC |
+| [`.claude/settings.json`](.claude/settings.json) | Claude Code permissions and automation hooks |
+| [`.claude/rules/`](.claude/rules/) | Persistent coding and security standards |
+| [`.claude/plans/`](.claude/plans/) | Feature and architecture decision records |
+| [`.sample.env`](.sample.env) | Safe env template for local setup |

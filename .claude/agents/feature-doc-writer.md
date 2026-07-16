@@ -29,7 +29,7 @@ You are a technical writer for the Support Ticket Management backend. Your job i
 ## Output location
 
 Save to: `documents/{feature-slug}.md`
-Use `kebab-case` (e.g. `documents/tickets-module.md`, `documents/notifications.md`).
+Use `kebab-case`, matching the corresponding `.claude/plans/{feature-slug}.md` name (e.g. `documents/tickets-module.md`, `documents/notifications-email.md`).
 
 If `documents/` does not exist, create it first with: `Bash(mkdir -p documents/)`.
 

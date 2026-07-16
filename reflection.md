@@ -1,6 +1,6 @@
 # Reflection
 
-Retrospective on AI-assisted development across this project's lifecycle. Unlike `.claude/workflow.md` (the process we follow) or the two notes logs (dated incident records), this is the honest "how did it actually go" — updated at major milestones, not after every commit.
+Retrospective on AI-assisted development across this project's lifecycle. Unlike `tool-workflow.md` (the process we follow) or the two notes logs (dated incident records), this is the honest "how did it actually go" — updated at major milestones, not after every commit.
 
 **Last updated:** 2026-07-09, after Phase 9 (full test suite) and Phase 10 (bug fixes / screenshot removal).
 
@@ -10,7 +10,7 @@ A ten-phase backend build: infra/tooling → schema → auth → tickets → com
 
 ## How AI was used
 
-Not ad hoc prompting — a defined agent pipeline (`.claude/agents/`): `requirement-fetcher → feature-planner → feature-implementer → code-reviewer → docs-updater`, orchestrated by `/build-feature` with human checkpoints after planning and after implementation. `code-reviewer` also runs automatically on every `.ts`/`.js` edit via a `PostToolUse` hook. Full detail in `.claude/workflow.md`.
+Not ad hoc prompting — a defined agent pipeline (`.claude/agents/`): `requirement-fetcher → feature-planner → feature-implementer → code-reviewer → docs-updater`, orchestrated by `/build-feature` with human checkpoints after planning and after implementation. `code-reviewer` also runs automatically on every `.ts`/`.js` edit via a `PostToolUse` hook. Full detail in `tool-workflow.md`.
 
 ## What worked well
 
@@ -35,7 +35,7 @@ Every entry below has a full write-up in `debugging-notes.md` or `code-review-no
 
 ## How AI output was validated
 
-Never trusted on the strength of "it compiles." Layered gate: `tsc --noEmit` (hooked on every edit) → ESLint → Prettier → Husky pre-commit → Jest (`--runInBand`, since parallel workers hit `users_email_key` collisions sharing one test DB — see the Phase 10 acceptance-criteria note in `.claude/task.md`) → manual Non-Negotiables checklist (`.claude/workflow.md` §6) → `code-reviewer` hook → human PR review.
+Never trusted on the strength of "it compiles." Layered gate: `tsc --noEmit` (hooked on every edit) → ESLint → Prettier → Husky pre-commit → Jest (`--runInBand`, since parallel workers hit `users_email_key` collisions sharing one test DB — see the Phase 10 acceptance-criteria note in `.claude/task.md`) → manual Non-Negotiables checklist (`tool-workflow.md` §6) → `code-reviewer` hook → human PR review.
 
 ## Open items / what's next
 

@@ -2,7 +2,7 @@
 
 > **Requirements:** TEST-1, TEST-2, TEST-3, TEST-4, TEST-5, TEST-7, TEST-9, NFR-2, NFR-3, NFR-8, NFR-11, NFR-12, VAL-2, VAL-3, VAL-6, FR-1, FR-1a, FR-2a, FR-7, FR-10, FR-11, FR-13, FR-14, RBAC-1, RBAC-3, RBAC-4, RBAC-5
 > **Date:** 2026-07-09
-> **Predecessor:** `.claude/plans/testing-strategy.md` (Phase 9 strategy — this plan supersedes it with current state analysis)
+> **Predecessor:** `test-strategy.md` (Phase 9 strategy, now kept at repo root as a Process Doc — this plan supersedes it with current state analysis)
 
 ## Problem
 

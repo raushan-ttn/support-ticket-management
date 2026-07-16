@@ -101,16 +101,34 @@ Sub-agents live in `.claude/agents/*.md` (auto-discovered — never registered i
 
 ## Plans
 `.claude/plans/backend-tooling.md` · `.claude/plans/backend-database.md` · `.claude/plans/backend-schema.md`
-`.claude/plans/schema-alignment.md` · `.claude/plans/auth-validation-upload.md` · `.claude/plans/phase-0-gaps.md` · `.claude/plans/phase-1-schema-alignment.md` · `.claude/plans/tickets-module.md` · `.claude/plans/comments-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md` · `.claude/plans/testing-strategy.md` · `.claude/plans/phase-9-tests.md`
+`.claude/plans/schema-alignment.md` · `.claude/plans/auth-validation-upload.md` · `.claude/plans/phase-0-gaps.md` · `.claude/plans/phase-1-schema-alignment.md` · `.claude/plans/tickets-module.md` · `.claude/plans/comments-module.md` · `.claude/plans/notifications-email.md` · `.claude/plans/attachments-module.md` · `.claude/plans/phase-9-tests.md`
 
 ## Process Docs
 Root-level, cross-cutting documentation that doesn't belong to a single feature plan or module doc:
 
 | File | Content |
 |------|---------|
-| `.claude/workflow.md` | How AI is used across the full SDLC (context, planning, codegen, testing, debugging, review) — the process itself |
+| `tool-workflow.md` | How AI is used across the full SDLC (context, planning, codegen, testing, debugging, review) — the process itself |
+| `test-strategy.md` | Testing approach and coverage strategy — promoted out of `.claude/plans/` since it's cross-cutting, not feature-scoped |
 | `api-contract.md` | Role/scope enforcement map per endpoint (who can call what, where it's checked in code) — request/response shapes live in generated Swagger (`GET /api-docs`), not here |
 | `debugging-notes.md` | Dated log of non-obvious bugs found and fixed, with root cause — append a new entry per finding, not per commit |
-| `code-review-notes.md` | Dated log of convention/security findings actually caught in review — distinct from `.claude/workflow.md`'s review *process* |
+| `code-review-notes.md` | Dated log of convention/security findings actually caught in review — distinct from `tool-workflow.md`'s review *process* |
 | `reflection.md` | Periodic retrospective (what worked, what AI got wrong, what was deliberately overridden) — updated at milestones, not every commit |
 | `final-ai-usage-summary.md` | Quantitative rollup (commit/line counts, model usage) pulled from `git log` — updated alongside `reflection.md` |
+
+## Assessment Docs
+One-time submission package summarizing the finished backend for external review — snapshots derived from the canonical sources above (`.claude/requirements.md`, `.claude/plans/`, `.claude/task.md`) and from real `git`/`gh` history, not independently maintained specs. If any of these disagree with a canonical source, the canonical source wins.
+
+| File | Content |
+|------|---------|
+| `candidate-info.md` | Assessment submission metadata (name, tools used) — has open `TODO`s pending manual input |
+| `requirements-analysis.md` | Analytical summary of `.claude/requirements.md` for review purposes |
+| `data-model.md` | Entity-relationship overview derived from `src/db/schema.sql`, plus migration history |
+| `design-notes.md` | Key decisions and cross-cutting risks, consolidated by theme from `.claude/plans/*.md` |
+| `implementation-plan.md` | Phase-ordered build narrative consolidating the 11 plans in `.claude/plans/` |
+| `acceptance-criteria.md` | Snapshot of the `requirements.md` §13 checklist as last verified against `.claude/task.md` |
+| `test-results.md` | Real output from a specific test run — reproduce with the commands it documents, not a live figure |
+| `review-fixes.md` | Condensed, fix-oriented index of `code-review-notes.md` findings |
+| `pr-description.md` | Chronological log of actually-merged PRs (`gh pr list --state merged`) |
+| `ui-flow.md` | Explicit out-of-scope note — frontend/UI is not part of this backend's requirements |
+| `ai-prompts/*.md` | Real prompt templates behind each SDLC phase (planning, design, implementation, testing, debugging, code review, documentation) — companion evidence to `tool-workflow.md`, one file per phase |

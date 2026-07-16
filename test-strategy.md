@@ -12,7 +12,7 @@ Follow `.claude/rules/api-conventions.md` → Testing. Stack: **jest + supertest
 - **Unit (services):** `jest.mock` the `query` / `withTransaction` from `src/config/postgres.ts`; assert pure logic (state-machine function, recipient de-dup, validation branches).
 - **Integration (controllers):** `supertest(app)` against the real **`ttn_stm_test`** DB; assert status code → envelope → payload.
 
-`NODE_ENV=test` must route to `ttn_stm_test` (verify in `src/config/index.ts`) and activate nodemailer `jsonTransport` and `STORAGE_BACKEND=local`. Email notification functions are called **directly** in tests — there is no queue/worker, no BullMQ (see `notifications-email.md`). Auto-close (formerly TEST-8) is **removed from scope**, not deferred — see `requirements.md` §1.2 Out of Scope.
+`NODE_ENV=test` must route to `ttn_stm_test` (verify in `src/config/index.ts`) and activate nodemailer `jsonTransport` and `STORAGE_BACKEND=local`. Email notification functions are called **directly** in tests — there is no queue/worker, no BullMQ (see `.claude/plans/notifications-email.md`). Auto-close (formerly TEST-8) is **removed from scope**, not deferred — see `.claude/requirements.md` §1.2 Out of Scope.
 
 ## Files to Create / Modify
 
@@ -72,7 +72,7 @@ Scripts: `"test": "jest"` · `"test:watch": "jest --watch"` · `"test:coverage":
 - **Open handles**: ioredis + pg must all be closed in `afterAll` or Jest hangs. Run with `--detectOpenHandles` while stabilizing.
 - **ENUM casing**: tests must use uppercase values — they will fail until `schema-alignment.md` is applied to `ttn_stm_test`.
 - **Test-DB drift**: `db:migrate` must be re-run against `ttn_stm_test` after any `schema.sql` change; add a pretest hook if drift recurs.
-- **Stale queue calls in `comment.service.ts`**: `emailQueue.add()`/`autoCloseQueue.add()` calls (and `systemCloseTicket()` in `ticket.service.ts`) are dead code from before the direct-call/no-auto-close decision — see `notifications-email.md` Cleanup section and `task.md` Phase 7/8. Tests exercising `addComment()` should not assume a worker processes these; once cleanup lands, assert on the direct `sendCommentNotificationEmail()` call instead.
+- **Stale queue calls in `comment.service.ts`**: `emailQueue.add()`/`autoCloseQueue.add()` calls (and `systemCloseTicket()` in `ticket.service.ts`) are dead code from before the direct-call/no-auto-close decision — see `.claude/plans/notifications-email.md` Cleanup section and `.claude/task.md` Phase 7/8. Tests exercising `addComment()` should not assume a worker processes these; once cleanup lands, assert on the direct `sendCommentNotificationEmail()` call instead.
 
 ## Non-Negotiables Checklist
 - [ ] Tests use `ttn_stm_test`, never `ttn_stm`

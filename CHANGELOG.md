@@ -129,6 +129,38 @@ None
 
 ---
 
+## 2026-07-08 — Attachments Module (Phase 6)
+
+**Branch:** attachments_setup
+**Requirements:** TS-9, FR-13, FR-13a, FR-13b, FR-13c, FR-15, VAL-6, DM-8, DM-10, DM-11, CACHE-9, NFR-12, NFR-13
+
+### What was built
+Introduced a pluggable file storage abstraction (`IStorageBackend`, local-filesystem and S3-compatible implementations, selected via `STORAGE_BACKEND`) and wired attachment uploads inline into the ticket and comment mutation endpoints — `POST`/`PATCH /api/v1/tickets` and `POST /api/v1/tickets/:ticketId/comments` now accept optional `files` (`image/jpeg`/`image/png` only, per-file size and per-request count limits) via `multipart/form-data`. Per FR-15, there are no standalone `/api/v1/attachments/*` endpoints at this stage — uploaded files are persisted to the storage backend, metadata-only rows are recorded in Postgres, and an `attachments[]` array (with a directly browser-openable, absolute `url`; `storageKey` never exposed) is embedded inline in ticket and comment responses. Fixed a broken multer chain on the comment route where two separate multer instances could not be chained on a single multipart request, by parsing `screenshot` and `files` in one `multer().fields()` pass.
+
+### Files added / modified
+- `src/modules/attachments/attachment.schemas.ts` — `AttachmentRow` response interface, upload validation schema
+- `src/modules/attachments/attachment.service.ts` — `uploadAttachments()`, `toAttachmentUrl()`, `withAttachments()` helper for embedding metadata into ticket/comment responses
+- `src/modules/attachments/attachment.service.test.ts` — unit tests for upload validation and metadata embedding
+- `src/middlewares/uploadAttachments.ts` — multer config (memoryStorage, `image/jpeg`/`image/png` allowlist, configurable size/count limits)
+- `src/middlewares/uploadCommentFiles.ts` — multer `.fields()` config combining `screenshot` + `files` in one pass
+- `src/modules/tickets/ticket.service.ts`, `ticket.controller.ts`, `ticket.routes.ts`, `ticket.schemas.ts` — accept optional `files` on create/update; embed `attachments[]` via `withAttachments()`
+- `src/modules/comments/comment.service.ts`, `comment.controller.ts`, `comment.routes.ts`, `comment.schemas.ts` — accept optional `files` on comment creation; embed `attachments[]`
+- `src/app.ts` — storage backend static serving for local dev
+
+### New API endpoints
+None — attachments are accepted inline via existing ticket/comment mutation endpoints (FR-15); no standalone attachment routes at this stage (download/delete endpoints were added later in Phase 9, see the 2026-07-09 entry below).
+
+### New environment variables
+- `STORAGE_BACKEND` — `local` (default) or `s3`
+- `STORAGE_LOCAL_DIR` — local storage root (default: `public`)
+- `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_ENDPOINT` — S3-compatible storage config
+- `ATTACHMENT_MAX_FILE_SIZE_BYTES` / `ATTACHMENT_MAX_FILES_PER_REQUEST` — upload limits (VAL-6)
+
+### Breaking changes
+None
+
+---
+
 ## 2026-07-08 — Decision: Drop BullMQ, Email Sent Directly, Auto-Close Removed From Scope
 
 **Branch:** attachments_setup

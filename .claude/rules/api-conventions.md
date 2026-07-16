@@ -184,7 +184,7 @@ src/storage/
   index.ts (IStorageBackend + factory) / local.ts / s3.ts
 ```
 
-Modules: `auth`, `users`, `tickets`, `comments`, `attachments`. Shared logic → `src/utils/`.
+Modules: `auth`, `tickets`, `comments`, `attachments`. No `users` module — users are seed-only, no user-management API (`requirements.md` DM-1). Shared logic → `src/utils/`.
 
 **Middleware placement:** `src/middlewares/` holds only middleware with zero module imports (`authenticate`, `errorHandler`, `requireRole`, `validateBody`, `validateQuery`). Middleware that imports from a specific module (e.g. that module's `.schemas.ts`) belongs in that module as `{module}.middleware.ts`, not in `src/middlewares/`.
 
