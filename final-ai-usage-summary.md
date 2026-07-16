@@ -6,7 +6,7 @@ A rollup of AI's measurable contribution to this repo. Where `reflection.md` is 
 
 ## Tool
 
-**Claude Code**, via the agent pipeline in `.claude/agents/` (`requirement-fetcher → feature-planner → feature-implementer → code-reviewer → docs-updater`), not ad hoc chat prompting. Full process in `.claude/workflow.md`.
+**Claude Code**, via the agent pipeline in `.claude/agents/` (`requirement-fetcher → feature-planner → feature-implementer → code-reviewer → docs-updater`), not ad hoc chat prompting. Full process in `tool-workflow.md`.
 
 ## Scale (from `git log --all`)
 

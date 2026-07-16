@@ -1,6 +1,6 @@
 # Debugging Notes
 
-A living log of non-obvious bugs found and fixed during development — the *why*, which a commit diff or `CHANGELOG.md` entry doesn't capture on its own. See `.claude/workflow.md` §8 for the general AI-debugging process and the "common issues" pattern table this log feeds into.
+A living log of non-obvious bugs found and fixed during development — the *why*, which a commit diff or `CHANGELOG.md` entry doesn't capture on its own. See `tool-workflow.md` §8 for the general AI-debugging process and the "common issues" pattern table this log feeds into.
 
 Newest first.
 

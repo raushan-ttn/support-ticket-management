@@ -20,7 +20,7 @@ npm run dev
 - File attachments (image/jpeg, image/png only) — multiple files per ticket or per comment; uploaded inline via `multipart/form-data` on ticket create/update and comment creation, no standalone attachment endpoints. Attachment metadata (`id`, `filename`, `mimeType`, `sizeBytes`, `uploadedBy`, `createdAt`, `url`) is embedded in ticket and comment responses; `storageKey` is never exposed. `url` is an absolute, browser-openable URL (`APP_URL` + storage key for local dev, S3 object URL for prod). Local filesystem (dev, served via `express.static`) or S3 (prod) storage backend, selected via `STORAGE_BACKEND`
 - JWT-based session management with Passport
 - Redis caching for read-heavy operations, including per-ticket attachment metadata (`ticket:{id}:attachments`)
-- Email notifications (planned): direct SMTP/nodemailer send, fire-and-forget, no job queue, for new tickets and comments — see `.claude/plans/notifications-email.md`. Auto-close-on-stale-reply is out of scope (would have required a BullMQ delayed-job queue).
+- Email notifications: direct SMTP/nodemailer send, fire-and-forget, no job queue, for new tickets and comments — see `.claude/plans/notifications-email.md`. Auto-close-on-stale-reply is out of scope (would have required a BullMQ delayed-job queue).
 
 ## Scripts
 
@@ -48,10 +48,8 @@ Interactive API documentation is available via **Swagger UI** at `GET /api-docs`
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `POST` | `/api/v1/auth/register` | Create a new user account |
 | `POST` | `/api/v1/auth/login` | Authenticate and receive JWT |
-| `GET` | `/api/v1/users` | List all users (ADMIN only) |
-| `GET` | `/api/v1/users/:id` | Fetch user profile |
+| `GET` | `/api/v1/auth/me` | Fetch the currently authenticated user |
 | `POST` | `/api/v1/tickets` | Create a new ticket; accepts optional `files` (image/jpeg, image/png, multipart/form-data) as ticket-level attachments |
 | `GET` | `/api/v1/tickets` | List tickets (filtered by role) |
 | `GET` | `/api/v1/tickets/:id` | Fetch ticket details, including inline `attachments` array |
@@ -65,6 +63,8 @@ Interactive API documentation is available via **Swagger UI** at `GET /api-docs`
 | `DELETE` | `/api/v1/tickets/:ticketId/attachments/:attachmentId` | Delete attachment; RBAC: ADMIN can delete any, AGENT can delete only own uploads |
 
 There are no standalone `/api/v1/attachments/*` endpoints (except download/delete under tickets) — attachments are uploaded as part of the ticket/comment mutation endpoints above and accessed via the `url` field embedded in ticket/comment responses (served directly from the storage backend; local dev via `express.static`, S3 via object URL in prod).
+
+There is no user-registration or user-management API — users exist only via seed data (`npm run db:seed`); see `requirements.md` DM-1 and the reconciliation note in `.claude/plans/auth-validation-upload.md`.
 
 ## Environment Variables
 
@@ -91,7 +91,7 @@ npm run test:watch   # Watch mode
 npm run test:coverage # Coverage report
 ```
 
-Tests use SQLite in-memory database (`NODE_ENV=test`) and Jest with supertest for HTTP assertions. See `.claude/rules/api-conventions.md` for testing conventions.
+Tests use the real PostgreSQL `ttn_stm_test` database (`NODE_ENV=test`) and Jest with supertest for HTTP assertions. See `.claude/rules/api-conventions.md` for testing conventions.
 
 ## Documentation
 
@@ -100,3 +100,5 @@ Tests use SQLite in-memory database (`NODE_ENV=test`) and Jest with supertest fo
 - **API & TypeScript rules:** `.claude/rules/api-conventions.md`
 - **Database & cache rules:** `.claude/rules/db-conventions.md`
 - **Change history:** `CHANGELOG.md`
+- **Feature reference docs:** `documents/*.md`
+- **AI process & assessment docs:** see `CLAUDE.md`'s Process Docs / Assessment Docs tables

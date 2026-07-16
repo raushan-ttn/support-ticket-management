@@ -1,6 +1,6 @@
 # Code Review Notes
 
-A living log of findings actually caught during review — convention or security violations, not routine diffs. Distinct from `.claude/workflow.md` §9, which documents the *review process* (checklist, prompts); this file is the *history* of what that process has caught. Findings feed back into `.claude/rules/` when they reveal a rule worth stating explicitly, and into the `code-reviewer` agent hook (`.claude/hooks/file-review.sh`) coverage.
+A living log of findings actually caught during review — convention or security violations, not routine diffs. Distinct from `tool-workflow.md` §9, which documents the *review process* (checklist, prompts); this file is the *history* of what that process has caught. Findings feed back into `.claude/rules/` when they reveal a rule worth stating explicitly, and into the `code-reviewer` agent hook (`.claude/hooks/file-review.sh`) coverage.
 
 Newest first.
 
